@@ -4,6 +4,8 @@
 
 An interactive web map of Morrowind, Bloodmoon, Tamriel Rebuilt, Project Cyrodiil and Skyrim: Home of the Nords, generated from the plugin files of the game and the mods.
 
+The repository is large: about 700 MB in some 146,000 files. Almost all of that is map tiles in `web/public/data/tiles`, small WebP images rendered ahead of time from the landscape of the game and the mods, so that the site can be served as plain static files. The code itself is a few hundred kilobytes. Cloning takes a while; `git clone --depth 1` skips the history of earlier tile builds.
+
 ## Run the site
 
 ```
