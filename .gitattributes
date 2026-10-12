@@ -1,0 +1,7 @@
+# Text files keep Unix line endings on every machine.
+* text=auto eol=lf
+
+# Map tiles and pictures are never touched.
+*.webp binary
+*.jpg binary
+*.png binary

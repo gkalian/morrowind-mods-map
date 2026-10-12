@@ -1,0 +1,10 @@
+# Machine-specific paths to the game and mods
+*.local.toml
+
+# Unpacked mod files, not redistributable
+/.mods/
+
+# Build output
+/pipeline/target/
+/web/node_modules/
+/web/dist/

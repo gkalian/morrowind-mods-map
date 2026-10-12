@@ -1,0 +1,52 @@
+# Plugin Sets shown on the Map, in load order.
+# File names are looked up in the data directories listed in paths.local.toml.
+
+# Pixels per Cell at the deepest zoom: 256, 512, 1024 or 2048.
+# Each step doubles the sharpness of the landscape textures and roughly quadruples the tile data.
+cell_pixels = 1024
+# Smallest zoom level to build tiles for (the deepest one is 10 at 1024 pixels per Cell).
+min_zoom = 2
+# Colour of open water, also used as the page background.
+water = [52, 78, 110]
+
+# Old landmass of the whole continent, drawn under the mods where they have no land of their own.
+[[set]]
+id = "tamriel"
+name = "Tamriel"
+version = "4.0"
+plugins = ["Tamriel.esm"]
+backdrop_for = ["tr", "pc", "shotn"]
+cell_pixels = 256
+
+[[set]]
+id = "morrowind"
+name = "Morrowind"
+plugins = ["Morrowind.esm"]
+archives = ["Morrowind.bsa"]
+default_on = true
+locked = true
+
+[[set]]
+id = "bloodmoon"
+name = "Bloodmoon"
+plugins = ["Bloodmoon.esm"]
+archives = ["Tribunal.bsa", "Bloodmoon.bsa"]
+default_on = true
+
+[[set]]
+id = "tr"
+name = "Tamriel Rebuilt"
+version = "26.09.27"
+plugins = ["Tamriel_Data.esm", "TR_Mainland.esm"]
+
+[[set]]
+id = "pc"
+name = "Project Cyrodiil"
+version = "26.09a"
+plugins = ["Cyr_Main.ESM"]
+
+[[set]]
+id = "shotn"
+name = "Skyrim: Home of the Nords"
+version = "26.09a"
+plugins = ["Sky_Main.ESM"]

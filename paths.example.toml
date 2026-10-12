@@ -1,0 +1,18 @@
+# Where the game and the mods are on your machine.
+# Copy this file to paths.local.toml and change the paths; paths.local.toml is never committed.
+
+# Morrowind install: Morrowind.esm, Bloodmoon.esm, Tribunal.esm and their BSAs.
+game_data_files = 'D:\Games\Morrowind\Data Files'
+
+# One data directory per mod: the folder that holds its plugin files and its Textures folder.
+# The names on the left are only labels. plugin-sets.toml lists the files that are looked for.
+[mod_data_files]
+tamriel_data = 'D:\Mods\Tamriel_Data\00 Data Files'
+tamriel_rebuilt = 'D:\Mods\Tamriel Rebuilt\00 Core\Data Files'
+project_cyrodiil = 'D:\Mods\Cyr_Main\00 Core'
+skyrim_home_of_the_nords = 'D:\Mods\Sky_Main\00 Data Files'
+tamriel = 'D:\Mods\Tamriel'
+
+# Optional and not read by the build: where the downloaded archives are, as a note to yourself.
+[mod_archives]
+tamriel_data = 'D:\Downloads\Tamriel Data.7z'
