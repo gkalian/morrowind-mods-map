@@ -11,6 +11,16 @@ interface Credit {
 
 const CREDITS: { title: string; entries: Credit[] }[] = [
   {
+    title: 'Source',
+    entries: [
+      {
+        name: 'Morrowind-mods-map',
+        url: 'https://github.com/gkalian/morrowind-mods-map',
+        role: 'on GitHub: the original code of this Map.',
+      },
+    ],
+  },
+  {
     title: 'Game',
     entries: [
       {
@@ -118,7 +128,7 @@ export function createFooter(manifest: Manifest): HTMLElement {
   const dialog = creditsDialog()
   const credits = document.createElement('button')
   credits.type = 'button'
-  credits.textContent = 'Credits'
+  credits.textContent = 'csredits'
   credits.addEventListener('click', () => dialog.showModal())
 
   const author = document.createElement('a')
