@@ -15,7 +15,7 @@ One square of the exterior grid, addressed by integer grid coordinates.
 _Avoid_: Tile (a Tile is an image, not a piece of the game world)
 
 **Terrain**:
-The textured top-down picture of the land itself: landscape textures, vertex colour and relief shading, with water shown separately.
+The textured top-down picture of the land and of what stands on it: the landscape with its textures, vertex colour and relief shading, the models placed in the exterior (buildings, rocks, trees), and water over both.
 _Avoid_: Base map, background, imagery
 
 **Plugin Set**:

@@ -2,6 +2,7 @@ mod assets;
 mod config;
 mod land;
 mod locations;
+mod objects;
 mod render;
 mod tiles;
 
@@ -20,6 +21,7 @@ use crate::assets::Assets;
 use crate::config::{find_file, LocalPaths, PluginSet, SetsFile};
 use crate::land::{Grid, World, TEX_SQUARES};
 use crate::locations::Collector;
+use crate::objects::Objects;
 use crate::tiles::{Quarter, TileXY, CELL_ZOOM};
 
 #[derive(Parser)]
@@ -45,6 +47,9 @@ enum Command {
         /// Render the Terrain of these Plugin Sets only, by id; the rest keep their tiles.
         #[arg(long, value_delimiter = ',')]
         only: Vec<String>,
+        /// For trying things out: render only the Cells inside west,south,east,north.
+        #[arg(long, value_delimiter = ',', allow_hyphen_values = true)]
+        area: Vec<i32>,
     },
 }
 
@@ -87,11 +92,15 @@ struct ManifestSet {
 
 fn main() -> Result<()> {
     match Cli::parse().command {
-        Command::Build { root, out, locations_only, only } => build(&root, &root.join(out), locations_only, &only),
+        Command::Build { root, out, locations_only, only, area } => build(&root, &root.join(out), locations_only, &only, &area),
     }
 }
 
-fn build(root: &PathBuf, out: &PathBuf, locations_only: bool, only: &[String]) -> Result<()> {
+fn build(root: &PathBuf, out: &PathBuf, locations_only: bool, only: &[String], area: &[i32]) -> Result<()> {
+    let in_area = |grid: &Grid| match area {
+        [west, south, east, north] => (*west..=*east).contains(&grid.0) && (*south..=*north).contains(&grid.1),
+        _ => true,
+    };
     let sets = SetsFile::load(&root.join("plugin-sets.toml"))?;
     let paths = LocalPaths::load(&root.join("paths.local.toml"))?;
     let dirs = paths.data_dirs();
@@ -123,6 +132,7 @@ fn build(root: &PathBuf, out: &PathBuf, locations_only: bool, only: &[String]) -
 
     let mut world = World::new(sets.cell_pixels / TEX_SQUARES as u32);
     let mut collector = Collector::default();
+    let mut objects = Objects::default();
     // Cells of the sets that cannot be switched off.
     let mut always_shown: HashSet<Grid> = HashSet::new();
     for (index, set) in sets.sets.iter().enumerate() {
@@ -136,11 +146,18 @@ fn build(root: &PathBuf, out: &PathBuf, locations_only: bool, only: &[String]) -
         if set.locked {
             always_shown.extend(&defined);
         }
+        if wanted(set) {
+            for plugin in &set.plugins {
+                objects.load_plugin(&find_file(&dirs, plugin)?, &assets)?;
+            }
+            println!("  {} models placed {} times so far", objects.models(), objects.placed());
+        }
 
         let written = if wanted(set) {
             // Land that is there whenever this set is shown; towards anything else its edge fades out.
             let solid: HashSet<Grid> = always_shown.iter().chain(&defined).copied().collect();
-            render_terrain(&world, &defined, Some(&solid), &out.join("tiles").join(&set.id), &sets, sets.cell_pixels, started)?
+            let cells: Vec<Grid> = defined.iter().copied().filter(in_area).collect();
+            render_terrain(&world, Some(&objects), &cells, Some(&solid), &out.join("tiles").join(&set.id), &sets, sets.cell_pixels, started)?
         } else {
             println!("  Terrain tiles kept as they are");
             0
@@ -180,6 +197,11 @@ fn build(root: &PathBuf, out: &PathBuf, locations_only: bool, only: &[String]) -
     }
     missing_textures.append(&mut world.missing_textures);
     drop(world);
+    objects.missing_models.sort();
+    println!("\n{} models could not be read", objects.missing_models.len());
+    for name in objects.missing_models.iter().take(20) {
+        println!("  {name}");
+    }
 
     // A Backdrop Set is rendered on its own, so that it changes nothing in the sets it lies under.
     for (index, set) in sets.sets.iter().enumerate() {
@@ -194,7 +216,7 @@ fn build(root: &PathBuf, out: &PathBuf, locations_only: bool, only: &[String]) -
         let defined = load_land(&mut world, set, &dirs, &assets)?;
 
         let written = if wanted(set) {
-            render_terrain(&world, &defined, None, &out.join("tiles").join(&set.id), &sets, pixels, started)?
+            render_terrain(&world, None, &defined, None, &out.join("tiles").join(&set.id), &sets, pixels, started)?
         } else {
             println!("  Terrain tiles kept as they are");
             0
@@ -249,6 +271,7 @@ fn load_land(world: &mut World, set: &PluginSet, dirs: &[PathBuf], assets: &Asse
 /// and returns how many tiles it wrote. With `solid` given, land fades out towards Cells outside it.
 fn render_terrain(
     world: &World,
+    objects: Option<&Objects>,
     cells: &[Grid],
     solid: Option<&HashSet<Grid>>,
     tiles_dir: &Path,
@@ -266,7 +289,7 @@ fn render_terrain(
     let rendered: Vec<(TileXY, Quarter, usize)> = cells
         .par_iter()
         .map(|&grid| {
-            let image = render::render_cell(world, grid, pixels, sets.water, solid);
+            let image = render::render_cell(world, objects, grid, pixels, sets.water, solid);
             let cell = tiles::write_cell(tiles_dir, grid, image, max_zoom);
             let count = done.fetch_add(1, Ordering::Relaxed) + 1;
             if count % step == 0 || count == cells.len() {

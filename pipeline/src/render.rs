@@ -1,6 +1,7 @@
 use std::collections::HashSet;
 
 use crate::land::{CellLand, Grid, World, TEX_SQUARES, VERTS};
+use crate::objects::Objects;
 
 /// Depth in game units at which the sea bed is no longer visible through the water.
 const OPAQUE_DEPTH: f32 = 900.0;
@@ -13,11 +14,29 @@ const LIGHT: [f32; 3] = [-0.5, 0.5, 0.707];
 /// How far into a Cell its Terrain fades out along an open edge, as a share of the Cell's side.
 const FADE: f32 = 0.4;
 
-/// Renders the Terrain of one Cell as `size` x `size` RGBA pixels, north at the top.
+/// How bright a surface is for the way it faces. Flat ground keeps its own brightness.
+pub fn shade(normal: [f32; 3]) -> f32 {
+    let length = (normal[0] * normal[0] + normal[1] * normal[1] + normal[2] * normal[2]).sqrt();
+    if length == 0.0 {
+        return 1.0;
+    }
+    let dot = (normal[0] * LIGHT[0] + normal[1] * LIGHT[1] + normal[2] * LIGHT[2]) / length;
+    (0.25 + 0.75 * dot / LIGHT[2]).clamp(0.3, 1.4)
+}
+
+/// Renders the Terrain of one Cell as `size` x `size` RGBA pixels, north at the top: the
+/// landscape, the models standing on it when `objects` is given, and the water over both.
 ///
 /// With `solid` given, the Cell fades to transparent towards every neighbour that is not in it,
 /// so that the edge of a Plugin Set's land blends into whatever lies under it.
-pub fn render_cell(world: &World, grid: Grid, size: u32, water: [u8; 3], solid: Option<&HashSet<Grid>>) -> Vec<u8> {
+pub fn render_cell(
+    world: &World,
+    objects: Option<&Objects>,
+    grid: Grid,
+    size: u32,
+    water: [u8; 3],
+    solid: Option<&HashSet<Grid>>,
+) -> Vec<u8> {
     let cell = &world.cells[&grid];
     // Neighbours without land, as steps east and north.
     let open: Vec<(i32, i32)> = match solid {
@@ -32,7 +51,9 @@ pub fn render_cell(world: &World, grid: Grid, size: u32, water: [u8; 3], solid: 
     let tex_px = n / TEX_SQUARES;
     let water = [water[0] as f32, water[1] as f32, water[2] as f32];
 
-    let mut out = vec![0u8; n * n * 4];
+    // What is seen from above before the water is laid over it, and how high it stands.
+    let mut land = vec![[0.0f32; 3]; n * n];
+    let mut heights = vec![0.0f32; n * n];
     for py in 0..n {
         for px in 0..n {
             // Position inside the Cell, 0..1 east and 0..1 north.
@@ -76,16 +97,25 @@ pub fn render_cell(world: &World, grid: Grid, size: u32, water: [u8; 3], solid: 
             for c in 0..3 {
                 normal[c] = lerp(&|j, i| cell.normals[j][i][c] as f32);
             }
-            let length = (normal[0] * normal[0] + normal[1] * normal[1] + normal[2] * normal[2]).sqrt();
-            let shade = if length > 0.0 {
-                let dot = (normal[0] * LIGHT[0] + normal[1] * LIGHT[1] + normal[2] * LIGHT[2]) / length;
-                // Flat ground keeps its own brightness.
-                (0.25 + 0.75 * dot / LIGHT[2]).clamp(0.3, 1.4)
-            } else {
-                1.0
-            };
+            let shade = shade(normal);
+            let at = py * n + px;
+            for c in 0..3 {
+                land[at][c] = (color[c] * shade).min(255.0);
+            }
+            heights[at] = lerp(&|j, i| cell.heights[j][i]);
+        }
+    }
 
-            let height = lerp(&|j, i| cell.heights[j][i]);
+    if let Some(objects) = objects {
+        objects.draw(grid, n, &mut land, &mut heights);
+    }
+
+    let mut out = vec![0u8; n * n * 4];
+    for py in 0..n {
+        for px in 0..n {
+            let u = (px as f32 + 0.5) / n as f32;
+            let v = 1.0 - (py as f32 + 0.5) / n as f32;
+            let height = heights[py * n + px];
             let water_opacity = if height < 0.0 {
                 (SHORE_OPACITY + (1.0 - SHORE_OPACITY) * (-height / OPAQUE_DEPTH)).min(1.0)
             } else {
@@ -94,8 +124,7 @@ pub fn render_cell(world: &World, grid: Grid, size: u32, water: [u8; 3], solid: 
 
             let at = (py * n + px) * 4;
             for c in 0..3 {
-                let land = (color[c] * shade).min(255.0);
-                out[at + c] = (land * (1.0 - water_opacity) + water[c] * water_opacity).round() as u8;
+                out[at + c] = (land[py * n + px][c] * (1.0 - water_opacity) + water[c] * water_opacity).round() as u8;
             }
             out[at + 3] = (opacity(&open, u, v) * 255.0).round() as u8;
         }

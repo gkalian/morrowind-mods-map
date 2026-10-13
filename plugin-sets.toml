@@ -3,8 +3,8 @@
 
 # Pixels per Cell at the deepest zoom: 256, 512, 1024 or 2048.
 # Each step doubles the sharpness of the landscape textures and roughly quadruples the tile data.
-cell_pixels = 1024
-# Smallest zoom level to build tiles for (the deepest one is 10 at 1024 pixels per Cell).
+cell_pixels = 2048
+# Smallest zoom level to build tiles for (the deepest one is 11 at 2048 pixels per Cell).
 min_zoom = 2
 # Colour of open water, also used as the page background.
 water = [52, 78, 110]

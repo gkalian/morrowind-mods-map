@@ -18,7 +18,7 @@ toml = "0.9"
 [dependencies.tes3]
 git = "https://github.com/Greatness7/tes3"
 default-features = false
-features = ["esp", "bsa"]
+features = ["esp", "bsa", "nif"]
 
 [profile.dev]
 opt-level = 2
