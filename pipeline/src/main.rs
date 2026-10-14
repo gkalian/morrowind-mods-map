@@ -4,6 +4,7 @@ mod land;
 mod locations;
 mod objects;
 mod render;
+mod russian;
 mod tiles;
 
 use std::collections::{HashMap, HashSet};
@@ -22,6 +23,7 @@ use crate::config::{find_file, LocalPaths, PluginSet, SetsFile};
 use crate::land::{Grid, World, TEX_SQUARES};
 use crate::locations::Collector;
 use crate::objects::Objects;
+use crate::russian::Russian;
 use crate::tiles::{Quarter, TileXY, CELL_ZOOM};
 
 #[derive(Parser)]
@@ -130,6 +132,8 @@ fn build(root: &PathBuf, out: &PathBuf, locations_only: bool, only: &[String], a
     let mut step = 0;
     let wanted = |set: &PluginSet| !locations_only && (only.is_empty() || only.contains(&set.id));
 
+    let russian = Russian::load(&paths.russian_data_files, &sets)?;
+
     let mut world = World::new(sets.cell_pixels / TEX_SQUARES as u32);
     let mut collector = Collector::default();
     let mut objects = Objects::default();
@@ -178,13 +182,15 @@ fn build(root: &PathBuf, out: &PathBuf, locations_only: bool, only: &[String], a
             collector.load_plugin(&find_file(&dirs, plugin)?)?;
         }
         let land: HashSet<Grid> = world.cells.keys().copied().collect();
-        let locations = collector.finish_set(&land);
+        let mut locations = collector.finish_set(&land);
+        russian.translate(&mut locations);
         println!(
-            "  {} settlements, {} interior entrances, {} regions and {} extended from earlier sets",
+            "  {} settlements, {} interior entrances, {} regions and {} extended from earlier sets, {} without a Russian name",
             locations.settlements.len(),
             locations.entrances.len(),
             locations.regions.iter().filter(|region| !region.continues).count(),
-            locations.regions.iter().filter(|region| region.continues).count()
+            locations.regions.iter().filter(|region| region.continues).count(),
+            Russian::untranslated(&locations)
         );
         let locations_dir = out.join("locations");
         fs::create_dir_all(&locations_dir).with_context(|| format!("creating {}", locations_dir.display()))?;

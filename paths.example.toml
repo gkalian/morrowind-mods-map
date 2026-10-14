@@ -4,6 +4,16 @@
 # Morrowind install: Morrowind.esm, Bloodmoon.esm, Tribunal.esm and their BSAs.
 game_data_files = 'D:\Games\Morrowind\Data Files'
 
+# Optional: folders of the Russian releases of the game and the mods, for the Russian names on the Map.
+# Each holds the .cel files with the Russian Cell names, and the Russian plugins for the Region names.
+russian_data_files = [
+  'D:\Games\Morrowind RU\Data Files',
+  'D:\Mods\Russian\td2608ru\data files',
+  'D:\Mods\Russian\tr2609ru\data files',
+  'D:\Mods\Russian\cyr2609ru\data files',
+  'D:\Mods\Russian\sky2609ru\data files',
+]
+
 # One data directory per mod: the folder that holds its plugin files and its Textures folder.
 # The names on the left are only labels. plugin-sets.toml lists the files that are looked for.
 [mod_data_files]

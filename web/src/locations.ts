@@ -1,17 +1,16 @@
+import { lang, t, type StringKey } from './i18n'
 import type { Manifest, PluginSet } from './manifest'
 
 export type Kind = 'settlement' | 'entrance' | 'region'
 
-export const KIND_NAMES: Record<Kind, string> = {
-  settlement: 'Settlement',
-  entrance: 'Interior Entrance',
-  region: 'Region',
+export function kindName(kind: Kind): string {
+  return t(kind)
 }
 
-export const KIND_PLURALS: Record<Kind, string> = {
-  settlement: 'Settlements',
-  entrance: 'Interior Entrances',
-  region: 'Regions',
+const PLURALS: Record<Kind, StringKey> = { settlement: 'settlements', entrance: 'entrances', region: 'regions' }
+
+export function kindPlural(kind: Kind): string {
+  return t(PLURALS[kind])
 }
 
 export type Grid = [number, number]
@@ -21,7 +20,10 @@ export interface Location {
   /** Stable enough to put in a link. */
   id: string
   kind: Kind
+  /** The name in the current language: the Russian one falls back to the English. */
   name: string
+  en: string
+  ru?: string
   set: PluginSet
   x: number
   y: number
@@ -34,9 +36,9 @@ export interface Location {
 }
 
 interface LocationsFile {
-  settlements: { name: string; x: number; y: number; cells: Grid[] }[]
-  entrances: { name: string; x: number; y: number }[]
-  regions: { id: string; name: string; color: string; x: number; y: number; cells: Grid[]; continues?: boolean }[]
+  settlements: { name: string; ru?: string; x: number; y: number; cells: Grid[] }[]
+  entrances: { name: string; ru?: string; x: number; y: number }[]
+  regions: { id: string; name: string; ru?: string; color: string; x: number; y: number; cells: Grid[]; continues?: boolean }[]
   renamed: Grid[]
 }
 
@@ -49,6 +51,12 @@ export interface MapLocations {
   regionAreas: Location[]
   /** For each Plugin Set, the Cells it renames: Settlements of other sets there give way to it. */
   renamedBy: Map<string, Grid[]>
+}
+
+/** Gives every Location its name in the current language. */
+export function localize(locations: Location[]): void {
+  const russian = lang() === 'ru'
+  for (const location of locations) location.name = (russian && location.ru) || location.en
 }
 
 function locationId(set: PluginSet, kind: Kind, name: string, x: number, y: number): string {
@@ -76,6 +84,8 @@ export async function loadLocations(manifest: Manifest): Promise<MapLocations> {
         kind: 'settlement',
         set,
         name: s.name,
+        en: s.name,
+        ru: s.ru,
         x: s.x,
         y: s.y,
         size: s.cells.length,
@@ -83,7 +93,7 @@ export async function loadLocations(manifest: Manifest): Promise<MapLocations> {
       })
     }
     for (const e of file.entrances) {
-      all.push({ id: locationId(set, 'entrance', e.name, e.x, e.y), kind: 'entrance', set, size: 0, ...e })
+      all.push({ id: locationId(set, 'entrance', e.name, e.x, e.y), kind: 'entrance', set, size: 0, en: e.name, ...e })
     }
     for (const r of file.regions) {
       const area: Location = {
@@ -91,6 +101,8 @@ export async function loadLocations(manifest: Manifest): Promise<MapLocations> {
         kind: 'region',
         set,
         name: r.name,
+        en: r.name,
+        ru: r.ru,
         x: r.x,
         y: r.y,
         size: r.cells.length,
@@ -101,5 +113,7 @@ export async function loadLocations(manifest: Manifest): Promise<MapLocations> {
       if (!r.continues) all.push(area)
     }
   }
+  localize(regionAreas)
+  localize(all)
   return { all, regionAreas, renamedBy }
 }

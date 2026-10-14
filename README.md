@@ -38,6 +38,10 @@ Copy `paths.example.toml` to `paths.local.toml` in the repository root and put y
 
 Each mod path is the folder that holds the mod's `.esm` files and its `Textures` and `Meshes` folders. The plugin files that are read, and the mod versions shown on the map, are listed in `plugin-sets.toml`. To leave a mod out, delete its `[[set]]` block there and its id from `backdrop_for` of the Tamriel set; a plugin that is listed but not found stops the build.
 
+### Russian names (optional)
+
+The Map can show its place names in Russian. They come from the Russian releases of the game and the mods: a Russian release keeps the English Cell names inside its plugins and lists the Russian name of each one in a `.cel` file next to the plugin, and the game's Russian plugins also hold the Russian Region names. List the folders with those `.cel` files and plugins under `russian_data_files` in `paths.local.toml`, as in `paths.example.toml`. Without them the Russian Map shows the English names.
+
 ### 2. Render the map data
 
 ```
@@ -58,7 +62,7 @@ A full build of all six Plugin Sets takes about 20 minutes and writes 460,000 ti
 To rebuild a part only:
 
 - `--only tr,pc` renders the named Plugin Sets and keeps the tiles of the rest. The ids are in `plugin-sets.toml`.
-- `--locations-only` skips the tiles and rewrites the places, regions and doors only.
+- `--locations-only` skips the tiles and rewrites the places, regions and doors only, with their Russian names.
 - `--area -3,-12,6,-5` renders the Cells inside west,south,east,north only, for trying things out.
 
 The size and the time depend on `cell_pixels` in `plugin-sets.toml`, the pixels per game Cell at the deepest zoom. Halving it from 2048 to 1024 gives roughly a quarter of the size and of the time.

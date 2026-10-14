@@ -23,6 +23,9 @@ pub struct Locations {
 #[derive(Serialize)]
 pub struct Settlement {
     pub name: String,
+    /// The Russian name, where the Russian release has one.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ru: Option<String>,
     pub x: f32,
     pub y: f32,
     pub cells: Vec<Grid>,
@@ -31,6 +34,8 @@ pub struct Settlement {
 #[derive(Serialize)]
 pub struct Entrance {
     pub name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ru: Option<String>,
     pub x: f32,
     pub y: f32,
 }
@@ -39,6 +44,8 @@ pub struct Entrance {
 pub struct RegionArea {
     pub id: String,
     pub name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ru: Option<String>,
     pub color: String,
     /// Where the name is written: the middle of the Region's largest connected part.
     pub x: f32,
@@ -138,7 +145,7 @@ impl Collector {
             for mut part in connected_parts(&cells, true) {
                 let (x, y) = middle(&part);
                 part.sort_unstable();
-                out.settlements.push(Settlement { name: name.clone(), x, y, cells: part });
+                out.settlements.push(Settlement { name: name.clone(), ru: None, x, y, cells: part });
             }
         }
 
@@ -158,7 +165,7 @@ impl Collector {
             }
             for group in groups {
                 let [x, y] = centre(&group);
-                out.entrances.push(Entrance { name: name.clone(), x: round(x), y: round(y) });
+                out.entrances.push(Entrance { name: name.clone(), ru: None, x: round(x), y: round(y) });
             }
         }
 
@@ -183,6 +190,7 @@ impl Collector {
                 id,
                 continues: self.region_names.contains(&name),
                 name: name.clone(),
+                ru: None,
                 color: format!("#{:02x}{:02x}{:02x}", color[0], color[1], color[2]),
                 x,
                 y,

@@ -47,6 +47,9 @@ pub struct LocalPaths {
     pub game_data_files: PathBuf,
     #[serde(default)]
     pub mod_data_files: BTreeMap<String, PathBuf>,
+    /// Folders of the Russian releases of the game and the mods, for the Russian names of the Locations.
+    #[serde(default)]
+    pub russian_data_files: Vec<PathBuf>,
 }
 
 impl SetsFile {

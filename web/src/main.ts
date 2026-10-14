@@ -1,10 +1,12 @@
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
+import '@fontsource-variable/montserrat'
 import './style.css'
 import { createFooter } from './footer'
+import { applyToDocument, lang, onLangChange, setLang, t } from './i18n'
 import { LabelLayer } from './labels'
 import { createLegend, type Shown } from './legend'
-import { KIND_NAMES, loadLocations, type Kind, type Location } from './locations'
+import { kindName, loadLocations, localize, type Kind, type Location } from './locations'
 import { loadManifest, type Manifest, type PluginSet } from './manifest'
 import { cellGrid, regionTint } from './overlays'
 import { createSearch } from './search'
@@ -13,7 +15,7 @@ import { createSearch } from './search'
 const EXTRA_ZOOM = 1
 
 /** Room the panel takes on the left, kept clear when the Map first frames the land. */
-const PANEL_WIDTH = 340
+const PANEL_WIDTH = 370
 
 /** Zoom the Map moves to when a Location of each kind is picked from far away. */
 const PICK_ZOOM: Record<Kind, number> = { region: 4, settlement: 6, entrance: 8 }
@@ -121,19 +123,19 @@ function locationCard(place: Location): HTMLElement {
   const name = document.createElement('strong')
   name.textContent = place.name
   const kind = document.createElement('div')
-  kind.textContent = `${KIND_NAMES[place.kind]} · ${place.set.name}`
+  kind.textContent = `${kindName(place.kind)} · ${place.set.name}`
   const cell = document.createElement('div')
-  cell.textContent = `Cell ${Math.floor(place.x)}, ${Math.floor(place.y)}`
+  cell.textContent = t('cell', { x: Math.floor(place.x), y: Math.floor(place.y) })
 
   const copy = document.createElement('button')
   copy.type = 'button'
-  copy.textContent = 'Copy link'
+  copy.textContent = t('copyLink')
   copy.addEventListener('click', async () => {
     try {
       await navigator.clipboard.writeText(location.href)
-      copy.textContent = 'Link copied'
+      copy.textContent = t('linkCopied')
     } catch {
-      copy.textContent = 'Could not copy'
+      copy.textContent = t('couldNotCopy')
     }
   })
 
@@ -142,6 +144,7 @@ function locationCard(place: Location): HTMLElement {
 }
 
 async function start(): Promise<void> {
+  applyToDocument()
   const manifest = await loadManifest()
   const { all: locations, regionAreas, renamedBy } = await loadLocations(manifest)
   document.documentElement.style.setProperty('--water', manifest.water)
@@ -291,6 +294,7 @@ async function start(): Promise<void> {
   })
 
   let selected: Location | null = null
+  let popup: L.Popup | null = null
 
   function select(place: Location, move: boolean): void {
     // A Location found in a Plugin Set that is off switches that set on.
@@ -300,15 +304,16 @@ async function start(): Promise<void> {
       onLegendChange()
     }
 
-    const popup = L.popup({ offset: [0, -6], autoPan: !move }).setLatLng([place.y, place.x]).setContent(locationCard(place))
-    popup.on('remove', () => {
+    const card = L.popup({ offset: [0, -6], autoPan: !move }).setLatLng([place.y, place.x]).setContent(locationCard(place))
+    card.on('remove', () => {
       if (selected !== place) return
       selected = null
       labels?.select(null)
       updateUrl((params) => params.delete('loc'))
     })
     // Opening the new card closes the previous one, so the selection changes only afterwards.
-    popup.openOn(map)
+    card.openOn(map)
+    popup = card
     selected = place
     labels?.select(place)
     updateUrl((params) => params.set('loc', place.id))
@@ -319,26 +324,52 @@ async function start(): Promise<void> {
   apply()
   labels = new LabelLayer(map, locations, isShown, (place) => select(place, false))
 
-  const legend = createLegend(manifest.sets.filter((set) => !set.backdropFor), locations, shown, onLegendChange, (place) => select(place, true))
+  const makeLegend = () =>
+    createLegend(manifest.sets.filter((set) => !set.backdropFor), locations, shown, onLegendChange, (place) => select(place, true))
+  let legend = makeLegend()
 
   const panel = document.createElement('div')
   panel.className = 'panel'
   const top = document.createElement('div')
   top.className = 'panel-top'
+  const language = document.createElement('button')
+  language.type = 'button'
+  language.className = 'icon-btn language'
+  language.addEventListener('click', () => setLang(lang() === 'ru' ? 'en' : 'ru'))
   const menu = document.createElement('button')
   menu.type = 'button'
-  menu.className = 'menu'
+  menu.className = 'icon-btn menu'
   menu.textContent = '☰'
-  menu.title = 'Legend'
-  menu.setAttribute('aria-label', 'Legend')
   menu.setAttribute('aria-expanded', 'true')
   menu.addEventListener('click', () => {
     const hidden = legend.element.toggleAttribute('hidden')
     menu.setAttribute('aria-expanded', String(!hidden))
   })
-  top.append(menu, createSearch(locations, (place) => select(place, true)))
+  function labelButtons(): void {
+    language.textContent = lang().toUpperCase()
+    language.title = t('language')
+    language.setAttribute('aria-label', t('language'))
+    menu.title = t('legend')
+    menu.setAttribute('aria-label', t('legend'))
+  }
+  labelButtons()
+  top.append(createSearch(locations, (place) => select(place, true)), language, menu)
   panel.append(top, legend.element)
   document.body.append(panel, createFooter(manifest))
+
+  onLangChange(() => {
+    localize(locations)
+    localize(regionAreas)
+    labelButtons()
+    // The legend is built anew in the other language and keeps whether it was folded away.
+    const next = makeLegend()
+    next.element.hidden = legend.element.hidden
+    legend.element.replaceWith(next.element)
+    legend = next
+    labels?.refresh()
+    if (selected && popup?.isOpen()) popup.setContent(locationCard(selected))
+    updateUrl((params) => params.set('lang', lang()))
+  })
 
   const linked = new URLSearchParams(location.search).get('loc')
   const place = linked ? locations.find((candidate) => candidate.id === linked) : undefined
@@ -347,7 +378,7 @@ async function start(): Promise<void> {
   const cursor = document.getElementById('cursor')!
   map.on('mousemove', (event: L.LeafletMouseEvent) => {
     const { lat, lng } = event.latlng
-    cursor.textContent = `Cell ${Math.floor(lng)}, ${Math.floor(lat)}`
+    cursor.textContent = t('cell', { x: Math.floor(lng), y: Math.floor(lat) })
   })
   map.on('mouseout', () => {
     cursor.textContent = ''

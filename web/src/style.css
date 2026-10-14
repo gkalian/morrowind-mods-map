@@ -1,3 +1,16 @@
+/* Colours of the panel and the cards; everything else refers to these. */
+:root {
+  --font: 'Montserrat Variable', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --bg: rgb(255 255 255 / 92%);
+  --bg-solid: #fff;
+  --fg: #1b1e24;
+  --muted: #68707d;
+  --border: rgb(20 24 32 / 12%);
+  --field: rgb(20 24 32 / 5%);
+  --hover: rgb(20 24 32 / 7%);
+  --shadow: 0 10px 40px rgb(15 20 30 / 18%);
+}
+
 html,
 body,
 #map {
@@ -5,8 +18,9 @@ body,
   margin: 0;
 }
 
-body {
-  font-family: system-ui, sans-serif;
+body,
+.leaflet-container {
+  font-family: var(--font);
 }
 
 #map {
@@ -94,69 +108,133 @@ body {
   background: #ffd76a;
 }
 
-/* Search */
+/* Panel: search and legend in one card, as in the metro map */
 
 .panel {
   position: absolute;
-  top: 8px;
-  left: 8px;
+  top: 12px;
+  left: 12px;
   z-index: 1000;
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  width: min(320px, calc(100vw - 16px));
-  max-height: calc(100vh - 70px);
+  gap: 10px;
+  box-sizing: border-box;
+  width: min(348px, calc(100vw - 24px));
+  max-height: calc(100vh - 80px);
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: var(--bg);
+  backdrop-filter: blur(14px) saturate(1.4);
+  box-shadow: var(--shadow);
+  color: var(--fg);
   font-size: 14px;
+  line-height: 1.4;
 }
 
 .panel-top {
   display: flex;
-  align-items: flex-start;
-  gap: 4px;
+  align-items: center;
+  gap: 6px;
 }
 
-.menu {
+.icon-btn {
   flex: none;
-  width: 34px;
-  height: 34px;
-  border: 0;
-  border-radius: 4px;
-  background: rgb(255 255 255 / 92%);
-  color: #1b1b1b;
-  font-size: 18px;
-  line-height: 1;
-  box-shadow: 0 1px 4px rgb(0 0 0 / 40%);
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: transparent;
+  color: var(--fg);
+  font: inherit;
+  font-size: 17px;
   cursor: pointer;
 }
 
+.icon-btn:hover,
+.icon-btn:focus-visible {
+  background: var(--hover);
+}
+
+.language {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
 .search {
+  position: relative;
+  display: flex;
   flex: 1;
+  align-items: center;
+  gap: 8px;
   min-width: 0;
+  padding: 0 6px 0 10px;
+  border: 1px solid transparent;
+  border-radius: 11px;
+  background: var(--field);
+}
+
+.search:focus-within {
+  border-color: var(--muted);
+}
+
+/* A magnifying glass: a ring with a handle. */
+.search-icon {
+  position: relative;
+  flex: none;
+  width: 10px;
+  height: 10px;
+  margin: 0 3px 3px 0;
+  border: 2px solid var(--muted);
+  border-radius: 50%;
+}
+
+.search-icon::after {
+  position: absolute;
+  right: -5px;
+  bottom: -5px;
+  width: 6px;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--muted);
+  transform: rotate(45deg);
+  content: '';
 }
 
 .search input {
-  height: 34px;
-  box-sizing: border-box;
-  width: 100%;
-  padding: 8px 10px;
+  flex: 1;
+  min-width: 0;
+  height: 40px;
+  padding: 0;
   border: 0;
-  border-radius: 4px;
-  background: rgb(255 255 255 / 92%);
-  color: #1b1b1b;
+  outline: 0;
+  background: transparent;
+  color: inherit;
   font: inherit;
   font-size: 14px;
-  box-shadow: 0 1px 4px rgb(0 0 0 / 40%);
+}
+
+.search input::placeholder {
+  color: var(--muted);
 }
 
 .search-results {
+  position: absolute;
+  z-index: 5;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
   max-height: min(60vh, 420px);
-  margin: 4px 0 0;
-  padding: 0;
+  margin: 0;
+  padding: 4px;
   overflow-y: auto;
-  border-radius: 4px;
-  background: rgb(255 255 255 / 96%);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg-solid);
   list-style: none;
-  box-shadow: 0 1px 4px rgb(0 0 0 / 40%);
+  box-shadow: var(--shadow);
 }
 
 .search-results:empty {
@@ -167,10 +245,11 @@ body {
   display: flex;
   flex-direction: column;
   width: 100%;
-  padding: 6px 10px;
+  padding: 7px 8px;
   border: 0;
+  border-radius: 8px;
   background: none;
-  color: #1b1b1b;
+  color: var(--fg);
   font: inherit;
   font-size: 14px;
   text-align: left;
@@ -179,23 +258,22 @@ body {
 
 .search-results button:hover,
 .search-results button:focus-visible {
-  background: #dde6f3;
+  background: var(--hover);
 }
 
 .search-results small {
-  color: #5b6470;
+  color: var(--muted);
+  font-size: 12px;
 }
 
 /* Legend */
 
 .legend {
   min-height: 0;
-  padding: 8px 10px;
+  margin: 0 -12px -12px;
+  padding: 8px 12px 12px;
   overflow-y: auto;
-  border-radius: 4px;
-  background: rgb(255 255 255 / 92%);
-  color: #1b1b1b;
-  box-shadow: 0 1px 4px rgb(0 0 0 / 40%);
+  border-top: 1px solid var(--border);
 }
 
 .legend[hidden] {
@@ -205,8 +283,8 @@ body {
 .legend-set {
   display: flex;
   align-items: flex-start;
-  gap: 6px;
-  padding: 2px 0;
+  gap: 8px;
+  padding: 3px 0;
 }
 
 .legend-set > input {
@@ -223,7 +301,7 @@ body {
 }
 
 .legend summary small {
-  color: #5b6470;
+  color: var(--muted);
 }
 
 .legend details details {
@@ -241,8 +319,9 @@ body {
 
 .legend li button {
   width: 100%;
-  padding: 2px 6px;
+  padding: 3px 6px;
   border: 0;
+  border-radius: 6px;
   background: none;
   color: inherit;
   font: inherit;
@@ -252,21 +331,21 @@ body {
 
 .legend li button:hover,
 .legend li button:focus-visible {
-  background: #dde6f3;
+  background: var(--hover);
 }
 
 .legend-show {
   display: grid;
-  gap: 2px;
+  gap: 4px;
   margin-top: 8px;
   padding-top: 8px;
-  border-top: 1px solid #c9ced6;
+  border-top: 1px solid var(--border);
 }
 
 .check {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   cursor: pointer;
 }
 
@@ -302,11 +381,32 @@ body {
   bottom: 6px;
   left: 50%;
   z-index: 1000;
+  display: flex;
+  align-items: center;
+  gap: 8px;
   transform: translateX(-50%);
   color: rgb(255 255 255 / 55%);
-  font: 12px/1.4 system-ui, sans-serif;
+  font: 12px/1.4 var(--font);
   white-space: nowrap;
   text-shadow: 0 0 3px rgb(0 0 0 / 80%);
+}
+
+.footer__sep {
+  opacity: 0.5;
+}
+
+.footer__link {
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  filter: drop-shadow(0 0 2px rgb(0 0 0 / 80%));
+}
+
+.footer__link:hover,
+.footer__link:focus-visible {
+  background: rgb(0 0 0 / 35%);
 }
 
 .footer > button {
@@ -336,7 +436,7 @@ body {
   border-radius: 6px;
   background: #f1f1f4;
   color: #1c1c1f;
-  font: 14px/1.5 system-ui, sans-serif;
+  font: 14px/1.5 var(--font);
   white-space: normal;
   text-shadow: none;
 }

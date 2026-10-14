@@ -8,6 +8,7 @@ license = "MIT"
 [dependencies]
 anyhow = "1"
 clap = { version = "4", features = ["derive"] }
+encoding_rs = "0.8"
 image = { version = "0.25", default-features = false, features = ["dds", "tga", "bmp", "png"] }
 webp = { version = "0.3", default-features = false }
 rayon = "1"

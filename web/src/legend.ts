@@ -1,4 +1,5 @@
-import { KIND_PLURALS, type Kind, type Location } from './locations'
+import { t } from './i18n'
+import { kindPlural, type Kind, type Location } from './locations'
 import type { PluginSet } from './manifest'
 
 /** What the viewer has switched on. */
@@ -74,7 +75,7 @@ export function createLegend(
     toggle.type = 'checkbox'
     toggle.checked = shown.sets.has(set.id)
     toggle.disabled = set.locked
-    toggle.title = set.locked ? `${set.name} is always shown` : `Show ${set.name}`
+    toggle.title = t(set.locked ? 'alwaysShown' : 'showSet', { set: set.name })
     toggle.setAttribute('aria-label', toggle.title)
     toggle.addEventListener('change', () => {
       if (toggle.checked) shown.sets.add(set.id)
@@ -96,7 +97,7 @@ export function createLegend(
     const own = locations.filter((location) => location.set === set)
     for (const kind of LIST_ORDER) {
       const ofKind = own.filter((location) => location.kind === kind).sort((a, b) => a.name.localeCompare(b.name))
-      if (ofKind.length > 0) details.append(locationList(KIND_PLURALS[kind], ofKind, onPick))
+      if (ofKind.length > 0) details.append(locationList(kindPlural(kind), ofKind, onPick))
     }
 
     block.append(toggle, details)
@@ -106,11 +107,11 @@ export function createLegend(
   const show = document.createElement('div')
   show.className = 'legend-show'
   const options = [
-    checkbox('Settlements', () => shown.kinds.settlement, (on) => (shown.kinds.settlement = on)),
-    checkbox('Interior entrances', () => shown.kinds.entrance, (on) => (shown.kinds.entrance = on)),
-    checkbox('Region names', () => shown.kinds.region, (on) => (shown.kinds.region = on)),
-    checkbox('Region colours', () => shown.regionColours, (on) => (shown.regionColours = on)),
-    checkbox('Cell grid', () => shown.cellGrid, (on) => (shown.cellGrid = on)),
+    checkbox(t('showSettlements'), () => shown.kinds.settlement, (on) => (shown.kinds.settlement = on)),
+    checkbox(t('showEntrances'), () => shown.kinds.entrance, (on) => (shown.kinds.entrance = on)),
+    checkbox(t('showRegionNames'), () => shown.kinds.region, (on) => (shown.kinds.region = on)),
+    checkbox(t('showRegionColours'), () => shown.regionColours, (on) => (shown.regionColours = on)),
+    checkbox(t('showCellGrid'), () => shown.cellGrid, (on) => (shown.cellGrid = on)),
   ]
   for (const option of options) {
     option.row.addEventListener('change', onChange)
