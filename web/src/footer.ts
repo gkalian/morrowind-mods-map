@@ -1,148 +1,69 @@
-import { lang, onLangChange, t, type Lang } from './i18n'
+import { onLangChange, t, type StringKey } from './i18n'
 import type { Manifest } from './manifest'
-
-type Text = Record<Lang, string>
 
 interface Credit {
   name: string
   url?: string
   /** What it is to this Map. */
-  role: Text
+  role: StringKey
   /** Words that come before the name. */
-  lead?: Text
+  lead?: StringKey
 }
 
-const CREDITS: { title: Text; entries: Credit[] }[] = [
+const CREDITS: { title: StringKey; entries: Credit[] }[] = [
   {
-    title: { en: 'Game', ru: 'Игра' },
+    title: 'creditsGame',
     entries: [
-      {
-        name: 'The Elder Scrolls III: Morrowind',
-        url: 'https://elderscrolls.bethesda.net/en/morrowind',
-        role: {
-          en: 'by Bethesda Softworks. The landscape, its textures and every place name of Morrowind and Bloodmoon come from the game.',
-          ru: 'от Bethesda Softworks. Ландшафт, его текстуры и все названия мест Morrowind и Bloodmoon взяты из игры.',
-        },
-      },
+      { name: 'The Elder Scrolls III: Morrowind', url: 'https://elderscrolls.bethesda.net/en/morrowind', role: 'creditMorrowind' },
     ],
   },
   {
-    title: { en: 'Mods', ru: 'Моды' },
+    title: 'creditsMods',
     entries: [
-      {
-        name: 'Tamriel Rebuilt',
-        url: 'https://www.tamriel-rebuilt.org/',
-        role: { en: 'by the Tamriel Rebuilt team: the Morrowind mainland.', ru: 'от команды Tamriel Rebuilt: материковый Морровинд.' },
-      },
-      {
-        name: 'Project Tamriel',
-        url: 'https://www.project-tamriel.com/',
-        role: {
-          en: 'by the Project Tamriel team: Project Cyrodiil and Skyrim: Home of the Nords.',
-          ru: 'от команды Project Tamriel: Project Cyrodiil и Skyrim: Home of the Nords.',
-        },
-      },
-      {
-        name: 'Tamriel Data',
-        url: 'https://www.nexusmods.com/morrowind/mods/44537',
-        role: {
-          en: 'by the Tamriel Rebuilt and Project Tamriel teams: the textures their lands use.',
-          ru: 'от команд Tamriel Rebuilt и Project Tamriel: текстуры их земель.',
-        },
-      },
-      {
-        name: 'Solstheim Tomb of the Snow Prince',
-        url: 'https://www.nexusmods.com/morrowind/mods/46810',
-        role: { en: 'by Wollirollo and others: Solstheim remade.', ru: 'от Wollirollo и соавторов: переделанный Солстхейм.' },
-      },
-      {
-        name: 'Wyrmhaven',
-        url: 'https://www.nexusmods.com/morrowind/mods/42933',
-        role: { en: 'by Neoptolemus: an island west of Solstheim.', ru: 'от Neoptolemus: остров к западу от Солстхейма.' },
-      },
-      {
-        name: 'White Wolf of Lokken',
-        url: 'https://www.nexusmods.com/morrowind/mods/27306',
-        role: { en: 'by Emma and TeuTonic: Lokken island.', ru: 'от Emma и TeuTonic: остров Локкен.' },
-      },
-      {
-        name: 'Lyithdonea: The Azurian Isles',
-        url: 'https://www.nexusmods.com/morrowind/mods/43749',
-        role: { en: 'by Melchior Dahrk: islands between Tamriel and Akavir.', ru: 'от Melchior Dahrk: острова между Тамриэлем и Акавиром.' },
-      },
-      {
-        name: 'OAAB_Data',
-        url: 'https://www.nexusmods.com/morrowind/mods/49042',
-        role: { en: 'the textures and models the Azurian Isles use.', ru: 'текстуры и модели, которыми пользуются Лазурные острова.' },
-      },
-      {
-        name: 'Tamriel',
-        url: 'https://www.nexusmods.com/morrowind/mods/58155',
-        role: {
-          en: 'the landmass of the whole continent, drawn where the other mods have no land yet.',
-          ru: 'суша всего континента там, где у других модов земли ещё нет.',
-        },
-      },
+      { name: 'Tamriel Rebuilt', url: 'https://www.tamriel-rebuilt.org/', role: 'creditTamrielRebuilt' },
+      { name: 'Project Tamriel', url: 'https://www.project-tamriel.com/', role: 'creditProjectTamriel' },
+      { name: 'Tamriel Data', url: 'https://www.nexusmods.com/morrowind/mods/44537', role: 'creditTamrielData' },
+      { name: 'Solstheim Tomb of the Snow Prince', url: 'https://www.nexusmods.com/morrowind/mods/46810', role: 'creditTotsp' },
+      { name: 'Wyrmhaven', url: 'https://www.nexusmods.com/morrowind/mods/42933', role: 'creditWyrmhaven' },
+      { name: 'White Wolf of Lokken', url: 'https://www.nexusmods.com/morrowind/mods/27306', role: 'creditWhiteWolf' },
+      { name: 'Lyithdonea: The Azurian Isles', url: 'https://www.nexusmods.com/morrowind/mods/43749', role: 'creditAzurian' },
+      { name: 'OAAB_Data', url: 'https://www.nexusmods.com/morrowind/mods/49042', role: 'creditOaabData' },
+      { name: 'Tamriel', url: 'https://www.nexusmods.com/morrowind/mods/58155', role: 'creditTamriel' },
     ],
   },
   {
-    title: { en: 'Translation', ru: 'Перевод' },
+    title: 'creditsTranslation',
     entries: [
-      {
-        name: 'Morrowind',
-        role: {
-          en: 'in Russian, by 1C: the Russian names of Morrowind and Bloodmoon.',
-          ru: 'на русском от 1С: русские названия Morrowind и Bloodmoon.',
-        },
-        lead: { en: 'The release of', ru: 'Издание' },
-      },
+      { name: 'Morrowind', role: 'creditRussianMorrowind', lead: 'creditRussianMorrowindLead' },
       {
         name: 'Tamriel Rebuilt, Project Cyrodiil, Skyrim: Home of the Nords',
-        role: { en: 'the Russian names of the mods.', ru: 'русские названия модов.' },
-        lead: { en: 'Russian translations of', ru: 'Русские переводы' },
+        role: 'creditRussianMods',
+        lead: 'creditRussianModsLead',
       },
     ],
   },
   {
-    title: { en: 'Tools', ru: 'Инструменты' },
+    title: 'creditsTools',
     entries: [
-      {
-        name: 'tes3',
-        url: 'https://github.com/Greatness7/tes3',
-        role: {
-          en: 'by Greatness7: the library that reads the plugin and archive files.',
-          ru: 'от Greatness7: библиотека, которая читает файлы плагинов и архивов.',
-        },
-      },
-      { name: 'Leaflet', url: 'https://leafletjs.com/', role: { en: 'the map viewer.', ru: 'просмотр карты.' } },
-      {
-        name: 'mwmap',
-        url: 'https://github.com/MathisBullinger/mwmap',
-        role: { en: 'by Mathis Bullinger.', ru: 'от Mathis Bullinger.' },
-        lead: { en: 'Inspired by', ru: 'Вдохновлено' },
-      },
+      { name: 'tes3', url: 'https://github.com/Greatness7/tes3', role: 'creditTes3' },
+      { name: 'Leaflet', url: 'https://leafletjs.com/', role: 'creditLeaflet' },
+      { name: 'mwmap', url: 'https://github.com/MathisBullinger/mwmap', role: 'creditMwmap', lead: 'creditMwmapLead' },
     ],
   },
 ]
-
-const NOTE: Text = {
-  en: 'This is an unofficial fan project, not affiliated with Bethesda Softworks or the mod teams. The map images and place names belong to their authors.',
-  ru: 'Это неофициальный фанатский проект, не связанный с Bethesda Softworks и командами модов. Изображения карты и названия мест принадлежат их авторам.',
-}
 
 function creditsDialog(): HTMLDialogElement {
   const dialog = document.createElement('dialog')
   dialog.className = 'credits'
 
   function fill(): void {
-    const language = lang()
     const heading = document.createElement('h2')
     heading.textContent = t('credits')
     dialog.replaceChildren(heading)
 
     for (const group of CREDITS) {
       const title = document.createElement('h3')
-      title.textContent = group.title[language]
+      title.textContent = t(group.title)
       const list = document.createElement('ul')
       for (const credit of group.entries) {
         const item = document.createElement('li')
@@ -157,14 +78,14 @@ function creditsDialog(): HTMLDialogElement {
           name = document.createElement('strong')
         }
         name.textContent = credit.name
-        item.append(credit.lead ? `${credit.lead[language]} ` : '', name, ` ${credit.role[language]}`)
+        item.append(credit.lead ? `${t(credit.lead)} ` : '', name, ` ${t(credit.role)}`)
         list.append(item)
       }
       dialog.append(title, list)
     }
 
     const note = document.createElement('p')
-    note.textContent = NOTE[language]
+    note.textContent = t('creditsNote')
     const close = document.createElement('button')
     close.type = 'button'
     close.textContent = t('close')
@@ -200,7 +121,7 @@ export function createFooter(manifest: Manifest): HTMLElement {
   source.innerHTML = GITHUB_ICON
 
   function label(): void {
-    const date = new Date(manifest.build * 1000).toLocaleDateString(lang() === 'ru' ? 'ru-RU' : 'en-GB', {
+    const date = new Date(manifest.build * 1000).toLocaleDateString(t('dateLocale'), {
       day: 'numeric',
       month: 'long',
       year: 'numeric',

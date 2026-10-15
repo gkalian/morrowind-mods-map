@@ -1,65 +1,14 @@
+import en from './locales/en.json'
+import ru from './locales/ru.json'
+
 export type Lang = 'en' | 'ru'
 
 export const LANGS: Lang[] = ['en', 'ru']
 
-const STRINGS = {
-  en: {
-    title: 'Elderscrolls Morrowind Mods Map',
-    search: 'Search location',
-    legend: 'Legend',
-    language: 'Русский язык',
-    settlement: 'Settlement',
-    entrance: 'Interior Entrance',
-    region: 'Region',
-    settlements: 'Settlements',
-    entrances: 'Interior Entrances',
-    regions: 'Regions',
-    showSettlements: 'Settlements',
-    showEntrances: 'Interior entrances',
-    showRegionNames: 'Region names',
-    showRegionColours: 'Region colours',
-    showCellGrid: 'Cell grid',
-    alwaysShown: '{set} is always shown',
-    showSet: 'Show {set}',
-    cell: 'Cell {x}, {y}',
-    copyLink: 'Copy link',
-    linkCopied: 'Link copied',
-    couldNotCopy: 'Could not copy',
-    updated: 'Updated {date}',
-    sourceCode: 'Source code on GitHub',
-    credits: 'Credits',
-    close: 'Close',
-  },
-  ru: {
-    title: 'Карта Morrowind и модов',
-    search: 'Поиск локации',
-    legend: 'Легенда',
-    language: 'English',
-    settlement: 'Поселение',
-    entrance: 'Вход в помещение',
-    region: 'Регион',
-    settlements: 'Поселения',
-    entrances: 'Входы в помещения',
-    regions: 'Регионы',
-    showSettlements: 'Поселения',
-    showEntrances: 'Входы в помещения',
-    showRegionNames: 'Названия регионов',
-    showRegionColours: 'Цвета регионов',
-    showCellGrid: 'Сетка ячеек',
-    alwaysShown: '{set} показывается всегда',
-    showSet: 'Показать {set}',
-    cell: 'Ячейка {x}, {y}',
-    copyLink: 'Скопировать ссылку',
-    linkCopied: 'Ссылка скопирована',
-    couldNotCopy: 'Не удалось скопировать',
-    updated: 'Обновлено {date}',
-    sourceCode: 'Исходный код на GitHub',
-    credits: 'Благодарности',
-    close: 'Закрыть',
-  },
-} satisfies Record<Lang, Record<string, string>>
+export type StringKey = keyof typeof en
 
-export type StringKey = keyof (typeof STRINGS)['en']
+/** Every language must have every key English has; `tsc` fails otherwise. */
+const STRINGS: Record<Lang, Record<StringKey, string>> = { en, ru }
 
 const STORAGE_KEY = 'lang'
 
