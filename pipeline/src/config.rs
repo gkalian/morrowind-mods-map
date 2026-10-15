@@ -33,6 +33,9 @@ pub struct PluginSet {
     pub backdrop_for: Vec<String>,
     /// Pixels per Cell for this set alone, when it differs from the rest.
     pub cell_pixels: Option<u32>,
+    /// Exterior Cells that this set names by mistake, as `[x, y]`: they give no Settlement.
+    #[serde(default)]
+    pub ignore_cell_names: Vec<(i32, i32)>,
 }
 
 impl PluginSet {

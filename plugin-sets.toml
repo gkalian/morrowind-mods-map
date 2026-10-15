@@ -79,3 +79,5 @@ id = "azurian"
 name = "Lyithdonea: The Azurian Isles"
 version = "0.3.1"
 plugins = ["MD_Azurian Isles.esm"]
+# The plugin by mistake names two Cells far from its islands Caldera and Sadrith Mora.
+ignore_cell_names = [[27, -52], [46, -50]]

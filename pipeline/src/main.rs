@@ -185,6 +185,9 @@ fn build(root: &PathBuf, out: &PathBuf, locations_only: bool, only: &[String], a
         }
         let land: HashSet<Grid> = world.cells.keys().copied().collect();
         let mut locations = collector.finish_set(&land);
+        locations
+            .settlements
+            .retain(|settlement| !settlement.cells.iter().all(|cell| set.ignore_cell_names.contains(cell)));
         russian.translate(&mut locations);
         println!(
             "  {} settlements, {} interior entrances, {} regions and {} extended from earlier sets, {} without a Russian name",
