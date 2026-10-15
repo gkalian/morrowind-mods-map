@@ -4,9 +4,9 @@
 
 [MAP](https://tesmap.tesall.club/) | [Mirror](https://tesmap.tesall.ru/)
 
-An interactive web map of Morrowind, Bloodmoon, Tamriel Rebuilt, Project Cyrodiil and Skyrim: Home of the Nords, generated from the plugin files of the game and the mods.
+An interactive web map of Morrowind, Bloodmoon, Tamriel Rebuilt, Project Cyrodiil, Skyrim: Home of the Nords and a few island mods, generated from the plugin files of the game and the mods.
 
-The map data is not in the repository: it is about 3.4 GB of small WebP tiles rendered ahead of time from the landscape and the models of the game and the mods. Build it with the pipeline, as described below.
+The map data is not in the repository: it is about 1 GB of small WebP tiles rendered ahead of time from the landscape and the models of the game and the mods. Build it with the pipeline, as described below.
 
 Parsing is written in Rust, frontend part in typescript.
 
@@ -21,16 +21,20 @@ Parsing is written in Rust, frontend part in typescript.
   - [Tamriel Rebuilt](https://www.tamriel-rebuilt.org)
   - [Project Cyrodiil and Skyrim: Home of the Nords](https://www.project-tamriel.com)
   - [Tamriel](https://www.nexusmods.com/morrowind/mods/58155), the land drawn under the three mods above
+  - [Solstheim Tomb of the Snow Prince](https://www.nexusmods.com/morrowind/mods/46810), the `000 Core` folder
+  - [Wyrmhaven](https://www.nexusmods.com/morrowind/mods/42933)
+  - [White Wolf of Lokken](https://www.nexusmods.com/morrowind/mods/27306)
+  - [Lyithdonea: The Azurian Isles](https://www.nexusmods.com/morrowind/mods/43749), with [OAAB_Data](https://www.nexusmods.com/morrowind/mods/49042), the textures and models it uses
 
 Disk space for everything, the game aside:
 
 | What | Size |
 |---|---|
-| Unpacked mods | 3.8 GB |
-| Map data, `web/public/data` | 3.4 GB |
-| Built site, `web/dist` (a second copy of the data) | 3.4 GB |
+| Unpacked mods | 5.9 GB |
+| Map data, `web/public/data` | 1.0 GB |
+| Built site, `web/dist` (a second copy of the data) | 1.0 GB |
 | Rust and npm build files | 0.6 GB |
-| **Total** | **about 11 GB** |
+| **Total** | **about 8.5 GB** |
 
 ### 1. Say where the game and the mods are
 
@@ -48,16 +52,20 @@ The Map can show its place names in Russian. They come from the Russian releases
 cargo run --release --manifest-path pipeline/Cargo.toml -- build
 ```
 
-A full build of all six Plugin Sets takes about 20 minutes and writes 460,000 tiles. The first run also compiles the pipeline, a few minutes more. 
+A full build of all ten Plugin Sets takes about 12 minutes and writes 162,000 tiles. The first run also compiles the pipeline, a few minutes more. 
 
 | Plugin Set | Tiles |
 |---|---|
-| Morrowind | 0.66 GB |
-| Bloodmoon | 0.09 GB |
-| Tamriel Rebuilt | 1.9 GB |
-| Project Cyrodiil | 0.23 GB |
-| Skyrim: Home of the Nords | 0.42 GB |
+| Morrowind | 0.15 GB |
+| Bloodmoon | 0.03 GB |
+| Tamriel Rebuilt | 0.45 GB |
+| Project Cyrodiil | 0.05 GB |
+| Skyrim: Home of the Nords | 0.09 GB |
 | Tamriel | 0.13 GB |
+| Solstheim Tomb of the Snow Prince | 0.03 GB |
+| Wyrmhaven | 0.01 GB |
+| White Wolf of Lokken | 0.005 GB |
+| Lyithdonea: The Azurian Isles | 0.06 GB |
 
 To rebuild a part only:
 
@@ -65,7 +73,7 @@ To rebuild a part only:
 - `--locations-only` skips the tiles and rewrites the places, regions and doors only, with their Russian names.
 - `--area -3,-12,6,-5` renders the Cells inside west,south,east,north only, for trying things out.
 
-The size and the time depend on `cell_pixels` in `plugin-sets.toml`, the pixels per game Cell at the deepest zoom. Halving it from 2048 to 1024 gives roughly a quarter of the size and of the time.
+The size and the time depend on `cell_pixels` in `plugin-sets.toml`, the pixels per game Cell at the deepest zoom. It is 1024; doubling it to 2048 gives sharper textures up close at roughly four times the size and three times the time.
 
 ### 3. Look at it
 

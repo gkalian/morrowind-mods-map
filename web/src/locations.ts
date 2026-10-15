@@ -40,6 +40,7 @@ interface LocationsFile {
   entrances: { name: string; ru?: string; x: number; y: number }[]
   regions: { id: string; name: string; ru?: string; color: string; x: number; y: number; cells: Grid[]; continues?: boolean }[]
   renamed: Grid[]
+  cleared?: Grid[]
 }
 
 export interface MapLocations {
@@ -51,6 +52,8 @@ export interface MapLocations {
   regionAreas: Location[]
   /** For each Plugin Set, the Cells it renames: Settlements of other sets there give way to it. */
   renamedBy: Map<string, Grid[]>
+  /** For each Plugin Set, the Cells where it deletes or moves doors of earlier sets: their Interior Entrances there give way. */
+  clearedBy: Map<string, Grid[]>
 }
 
 /** Gives every Location its name in the current language. */
@@ -76,8 +79,10 @@ export async function loadLocations(manifest: Manifest): Promise<MapLocations> {
   const all: Location[] = []
   const regionAreas: Location[] = []
   const renamedBy = new Map<string, Grid[]>()
+  const clearedBy = new Map<string, Grid[]>()
   for (const { set, file } of files) {
     renamedBy.set(set.id, file.renamed)
+    clearedBy.set(set.id, file.cleared ?? [])
     for (const s of file.settlements) {
       all.push({
         id: locationId(set, 'settlement', s.name, s.x, s.y),
@@ -115,5 +120,5 @@ export async function loadLocations(manifest: Manifest): Promise<MapLocations> {
   }
   localize(regionAreas)
   localize(all)
-  return { all, regionAreas, renamedBy }
+  return { all, regionAreas, renamedBy, clearedBy }
 }

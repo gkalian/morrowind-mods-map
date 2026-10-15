@@ -51,6 +51,31 @@ const CREDITS: { title: Text; entries: Credit[] }[] = [
         },
       },
       {
+        name: 'Solstheim Tomb of the Snow Prince',
+        url: 'https://www.nexusmods.com/morrowind/mods/46810',
+        role: { en: 'by Wollirollo and others: Solstheim remade.', ru: 'от Wollirollo и соавторов: переделанный Солстхейм.' },
+      },
+      {
+        name: 'Wyrmhaven',
+        url: 'https://www.nexusmods.com/morrowind/mods/42933',
+        role: { en: 'by Neoptolemus: an island west of Solstheim.', ru: 'от Neoptolemus: остров к западу от Солстхейма.' },
+      },
+      {
+        name: 'White Wolf of Lokken',
+        url: 'https://www.nexusmods.com/morrowind/mods/27306',
+        role: { en: 'by Emma and TeuTonic: Lokken island.', ru: 'от Emma и TeuTonic: остров Локкен.' },
+      },
+      {
+        name: 'Lyithdonea: The Azurian Isles',
+        url: 'https://www.nexusmods.com/morrowind/mods/43749',
+        role: { en: 'by Melchior Dahrk: islands between Tamriel and Akavir.', ru: 'от Melchior Dahrk: острова между Тамриэлем и Акавиром.' },
+      },
+      {
+        name: 'OAAB_Data',
+        url: 'https://www.nexusmods.com/morrowind/mods/49042',
+        role: { en: 'the textures and models the Azurian Isles use.', ru: 'текстуры и модели, которыми пользуются Лазурные острова.' },
+      },
+      {
         name: 'Tamriel',
         url: 'https://www.nexusmods.com/morrowind/mods/58155',
         role: {

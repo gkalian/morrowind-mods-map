@@ -146,7 +146,7 @@ function locationCard(place: Location): HTMLElement {
 async function start(): Promise<void> {
   applyToDocument()
   const manifest = await loadManifest()
-  const { all: locations, regionAreas, renamedBy } = await loadLocations(manifest)
+  const { all: locations, regionAreas, renamedBy, clearedBy } = await loadLocations(manifest)
   document.documentElement.style.setProperty('--water', manifest.water)
 
   const map = L.map('map', {
@@ -206,9 +206,16 @@ async function start(): Promise<void> {
   let tint: L.GridLayer | null = null
   /** Cells whose name a shown Plugin Set has changed, with the id of that set. */
   let renamed = new Map<string, string>()
+  /** Cells where a shown Plugin Set has deleted or moved doors, with the ids of those sets. */
+  let cleared = new Map<string, string[]>()
 
   function isShown(place: Location): boolean {
     if (!shown.sets.has(place.set.id) || !shown.kinds[place.kind]) return false
+    if (place.kind === 'entrance') {
+      // An Interior Entrance gives way where another Plugin Set has taken its doors away.
+      const by = cleared.get(`${Math.floor(place.x)},${Math.floor(place.y)}`)
+      return !by?.some((id) => id !== place.set.id)
+    }
     if (place.kind !== 'settlement') return true
     // A Settlement gives way where a later Plugin Set has renamed its Cells.
     return !place.cells?.some(([x, y]) => (renamed.get(`${x},${y}`) ?? place.set.id) !== place.set.id)
@@ -237,6 +244,14 @@ async function start(): Promise<void> {
     renamed = new Map()
     for (const [id, cells] of renamedBy) {
       if (shown.sets.has(id)) for (const [x, y] of cells) renamed.set(`${x},${y}`, id)
+    }
+    cleared = new Map()
+    for (const [id, cells] of clearedBy) {
+      if (!shown.sets.has(id)) continue
+      for (const [x, y] of cells) {
+        const key = `${x},${y}`
+        cleared.set(key, [...(cleared.get(key) ?? []), id])
+      }
     }
 
     tint?.remove()

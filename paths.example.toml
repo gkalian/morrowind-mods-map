@@ -22,6 +22,11 @@ tamriel_rebuilt = 'D:\Mods\Tamriel Rebuilt\00 Core\Data Files'
 project_cyrodiil = 'D:\Mods\Cyr_Main\00 Core'
 skyrim_home_of_the_nords = 'D:\Mods\Sky_Main\00 Data Files'
 tamriel = 'D:\Mods\Tamriel'
+solstheim_tomb_of_the_snow_prince = 'D:\Mods\Solstheim Tomb of the Snow Prince\000 Core'
+wyrmhaven = 'D:\Mods\Wyrmhaven'
+white_wolf_of_lokken = 'D:\Mods\BT_Whitewolf_2_1\Data Files'
+oaab_data = 'D:\Mods\OAAB_Data\00 Core'
+azurian_isles = 'D:\Mods\MD_Azurian Isles\00 Core'
 
 # Optional and not read by the build: where the downloaded archives are, as a note to yourself.
 [mod_archives]

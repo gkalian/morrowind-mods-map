@@ -3,12 +3,38 @@ use std::path::Path;
 
 use anyhow::{Context, Result};
 use serde::Serialize;
-use tes3::esp::{Cell, ObjectFlags, Plugin, Region};
+use tes3::esp::{Cell, ObjectFlags, Plugin, Reference, Region};
 
 use crate::land::Grid;
 
 /// Side of a Cell in game units.
 pub const CELL_SIZE: f32 = 8192.0;
+
+/// An object placed in the world, named by the plugin that first placed it, in lower case,
+/// and its reference number there. Later plugins that move or delete it use the same key.
+pub type ReferenceKey = (String, u32);
+
+/// The file name of a plugin, in lower case, as other plugins list it among their masters.
+pub fn plugin_file(path: &Path) -> String {
+    path.file_name().map(|name| name.to_string_lossy().to_ascii_lowercase()).unwrap_or_default()
+}
+
+/// The masters of a plugin, in lower case, in the order its references count them from one.
+pub fn masters_of(plugin: &Plugin) -> Vec<String> {
+    plugin
+        .header()
+        .map(|header| header.masters.iter().map(|(name, _)| name.to_ascii_lowercase()).collect())
+        .unwrap_or_default()
+}
+
+/// The key of a reference in the plugin `file`; `None` when it names a master the plugin does not have.
+pub fn reference_key(file: &str, masters: &[String], reference: &Reference) -> Option<ReferenceKey> {
+    let owner = match reference.mast_index {
+        0 => file.to_string(),
+        index => masters.get(index as usize - 1)?.clone(),
+    };
+    Some((owner, reference.refr_index))
+}
 
 /// The Locations of one Plugin Set. Positions are in Cells, east and north.
 #[derive(Default, Serialize)]
@@ -18,6 +44,9 @@ pub struct Locations {
     pub regions: Vec<RegionArea>,
     /// Cells that an earlier Plugin Set had named and this one renames or leaves nameless.
     pub renamed: Vec<Grid>,
+    /// Cells where this set deletes or moves doors that an earlier Plugin Set placed.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub cleared: Vec<Grid>,
 }
 
 #[derive(Serialize)]
@@ -65,11 +94,15 @@ pub struct Collector {
     names: HashMap<Grid, String>,
     region_of: HashMap<Grid, String>,
     regions: HashMap<String, (String, [u8; 4])>,
+    // Doors into interiors placed by the Plugin Sets finished so far, in Cells.
+    doors: HashMap<ReferenceKey, [f32; 2]>,
     // What the current Plugin Set has added or changed.
     set_names: HashMap<Grid, String>,
     set_region_of: HashMap<Grid, String>,
-    set_doors: BTreeMap<String, Vec<[f32; 2]>>,
+    // Each door by its key: the interior it leads to and where it stands, in Cells.
+    set_doors: HashMap<ReferenceKey, (String, [f32; 2])>,
     set_renamed: Vec<Grid>,
+    set_cleared: Vec<Grid>,
     // Names of the Regions that the Plugin Sets finished so far have.
     region_names: HashSet<String>,
 }
@@ -78,6 +111,8 @@ impl Collector {
     pub fn load_plugin(&mut self, path: &Path) -> Result<()> {
         let plugin = Plugin::from_path_filtered(path, |tag| matches!(&tag, b"TES3" | b"CELL" | b"REGN"))
             .with_context(|| format!("loading {}", path.display()))?;
+        let file = plugin_file(path);
+        let masters = masters_of(&plugin);
 
         for region in plugin.objects_of_type::<Region>() {
             self.regions
@@ -113,6 +148,13 @@ impl Collector {
             }
 
             for reference in cell.references.values() {
+                let Some(key) = reference_key(&file, &masters, reference) else { continue };
+                // A door deleted or moved is no longer where it stood.
+                if self.set_doors.remove(&key).is_none() {
+                    if let Some([x, y]) = self.doors.get(&key) {
+                        self.set_cleared.push((x.floor() as i32, y.floor() as i32));
+                    }
+                }
                 if reference.deleted == Some(true) {
                     continue;
                 }
@@ -122,10 +164,7 @@ impl Collector {
                     continue;
                 }
                 let [x, y, _] = reference.translation;
-                self.set_doors
-                    .entry(destination.cell.clone())
-                    .or_default()
-                    .push([x / CELL_SIZE, y / CELL_SIZE]);
+                self.set_doors.insert(key, (destination.cell.clone(), [x / CELL_SIZE, y / CELL_SIZE]));
             }
         }
         Ok(())
@@ -149,7 +188,13 @@ impl Collector {
             }
         }
 
-        for (name, mut positions) in std::mem::take(&mut self.set_doors) {
+        let mut doors: BTreeMap<String, Vec<[f32; 2]>> = BTreeMap::new();
+        for (key, (name, position)) in self.set_doors.drain() {
+            doors.entry(name).or_default().push(position);
+            // A door keeps the place where the plugin that first placed it put it.
+            self.doors.entry(key).or_insert(position);
+        }
+        for (name, mut positions) in doors {
             positions.sort_by(|a, b| a[0].total_cmp(&b[0]).then(a[1].total_cmp(&b[1])));
             // Doors of one interior that stand within a Cell's width of each other are one Interior Entrance.
             let mut groups: Vec<Vec<[f32; 2]>> = Vec::new();
@@ -205,6 +250,9 @@ impl Collector {
         out.renamed = std::mem::take(&mut self.set_renamed);
         out.renamed.sort_unstable();
         out.renamed.dedup();
+        out.cleared = std::mem::take(&mut self.set_cleared);
+        out.cleared.sort_unstable();
+        out.cleared.dedup();
         out
     }
 }

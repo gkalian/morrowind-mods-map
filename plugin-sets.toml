@@ -3,8 +3,8 @@
 
 # Pixels per Cell at the deepest zoom: 256, 512, 1024 or 2048.
 # Each step doubles the sharpness of the landscape textures and roughly quadruples the tile data.
-cell_pixels = 2048
-# Smallest zoom level to build tiles for (the deepest one is 11 at 2048 pixels per Cell).
+cell_pixels = 1024
+# Smallest zoom level to build tiles for (the deepest one is 10 at 1024 pixels per Cell).
 min_zoom = 2
 # Colour of open water, also used as the page background.
 water = [52, 78, 110]
@@ -50,3 +50,32 @@ id = "shotn"
 name = "Skyrim: Home of the Nords"
 version = "26.09a"
 plugins = ["Sky_Main.ESM"]
+
+# The sets below come last so that rendering them changes nothing in the tiles of the sets above.
+
+# Lokken island between Vvardenfell and Solstheim, made for Bloodmoon as it came. It comes before
+# Tomb of the Snow Prince, which reshapes those waters: with both on, Solstheim is drawn over Lokken.
+[[set]]
+id = "whitewolf"
+name = "White Wolf of Lokken"
+version = "2.1"
+plugins = ["BT_Whitewolf_2_0.esm"]
+
+# Solstheim overhaul: replaces nearly all of Bloodmoon's land and objects, and is drawn over it.
+[[set]]
+id = "totsp"
+name = "Solstheim Tomb of the Snow Prince"
+version = "2.3.0"
+plugins = ["Solstheim Tomb of The Snow Prince.esm"]
+
+[[set]]
+id = "wyrmhaven"
+name = "Wyrmhaven"
+version = "3.0"
+plugins = ["Wyrmhaven.esm"]
+
+[[set]]
+id = "azurian"
+name = "Lyithdonea: The Azurian Isles"
+version = "0.3.1"
+plugins = ["MD_Azurian Isles.esm"]

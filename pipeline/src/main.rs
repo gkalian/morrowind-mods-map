@@ -152,8 +152,10 @@ fn build(root: &PathBuf, out: &PathBuf, locations_only: bool, only: &[String], a
         }
         if wanted(set) {
             for plugin in &set.plugins {
-                objects.load_plugin(&find_file(&dirs, plugin)?, &assets)?;
+                objects.load_plugin(&find_file(&dirs, plugin)?, &dirs, &assets)?;
             }
+            // The set's Terrain shows what it and the plugins it is built on place, not what other sets do.
+            objects.show_only(&set.plugins);
             println!("  {} models placed {} times so far", objects.models(), objects.placed());
         }
 
@@ -241,6 +243,20 @@ fn build(root: &PathBuf, out: &PathBuf, locations_only: bool, only: &[String], a
         entries[index] = Some(manifest_set(set, pixels.ilog2() as u8, &defined, None));
         missing_textures.append(&mut world.missing_textures);
     }
+    // The Map shows a Plugin Set only where its tiles are: kept tiles may be missing or partial.
+    for entry in entries.iter_mut() {
+        let Some(set) = entry else { continue };
+        let drawn = with_tiles(&out.join(&set.tiles), &set.land);
+        if drawn.is_empty() {
+            println!("warning: {} has no tiles in {}, left off the Map with its Locations", set.name, out.join(&set.tiles).display());
+            *entry = None;
+        } else if drawn.len() < set.cells {
+            println!("warning: {} has tiles for {} of its {} cells, the rest are left off the Map", set.name, drawn.len(), set.cells);
+            set.cells = drawn.len();
+            set.bounds = bounds_of(&drawn);
+            set.land = drawn.iter().flat_map(|grid| [grid.0, grid.1]).collect();
+        }
+    }
     manifest.sets = entries.into_iter().flatten().collect();
 
     println!();
@@ -310,6 +326,15 @@ fn render_terrain(
     println!("  {written} tiles at zoom {CELL_ZOOM}..{max_zoom}, building zoom {}..{}", sets.min_zoom, CELL_ZOOM - 1);
     written += tiles::build_levels(tiles_dir, quarters, CELL_ZOOM - 1, sets.min_zoom)?;
     Ok(written)
+}
+
+/// The Cells, given as x, y, x, y, ..., that have a tile in the tile folder at the zoom where a Cell is one tile.
+fn with_tiles(tiles_dir: &Path, land: &[i32]) -> Vec<Grid> {
+    let zoom = tiles_dir.join(CELL_ZOOM.to_string());
+    land.chunks_exact(2)
+        .map(|pair| (pair[0], pair[1]))
+        .filter(|&(x, y)| zoom.join(x.to_string()).join(format!("{}.webp", -(y + 1))).is_file())
+        .collect()
 }
 
 /// Cell grid extent, inclusive: west, south, east, north.

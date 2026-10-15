@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
 use rayon::prelude::*;
@@ -10,8 +10,9 @@ use tes3::nif::{
 };
 
 use crate::assets::Assets;
+use crate::config::find_file;
 use crate::land::Grid;
-use crate::locations::CELL_SIZE;
+use crate::locations::{masters_of, plugin_file, reference_key, ReferenceKey, CELL_SIZE};
 use crate::render::shade;
 
 /// Texture pixels below this opacity are left out where a model cuts shapes out of its texture.
@@ -59,6 +60,10 @@ struct Placed {
     /// Rotation and scale together.
     matrix: Mat3,
     rotation: Mat3,
+    /// Index of the plugin that placed it, into `Objects::files`.
+    plugin: u16,
+    /// Plugins that have deleted or moved it since.
+    removed_by: Vec<u16>,
 }
 
 /// Every model placed in the exterior by the plugins loaded so far: buildings, rocks, trees and
@@ -72,7 +77,13 @@ pub struct Objects {
     image_ids: HashMap<String, u32>,
     images: Vec<Option<Image>>,
     placed: Vec<Placed>,
+    /// An object by the plugin that first placed it and its reference number there.
+    by_reference: HashMap<ReferenceKey, u32>,
     by_cell: HashMap<Grid, Vec<u32>>,
+    /// The plugins loaded so far, in lower case, and the masters of each.
+    files: Vec<(String, Vec<String>)>,
+    /// For each of `files`, whether what it places and changes is drawn.
+    visible: Vec<bool>,
     pub missing_models: Vec<String>,
 }
 
@@ -91,12 +102,38 @@ impl Objects {
         self.models.iter().flatten().count()
     }
 
-    /// Loads the objects a plugin defines and the places where it puts them in the exterior.
-    pub fn load_plugin(&mut self, path: &Path, assets: &Assets) -> Result<()> {
+    /// Draws from now on only what these plugins and their masters place and change.
+    pub fn show_only(&mut self, plugins: &[String]) {
+        let mut wanted: Vec<String> = plugins.iter().map(|name| name.to_ascii_lowercase()).collect();
+        let mut visible = vec![false; self.files.len()];
+        while let Some(name) = wanted.pop() {
+            let Some(index) = self.files.iter().position(|(file, _)| *file == name) else { continue };
+            if !visible[index] {
+                visible[index] = true;
+                wanted.extend(self.files[index].1.iter().cloned());
+            }
+        }
+        self.visible = visible;
+    }
+
+    /// Loads the objects a plugin defines and the places where it puts them in the exterior,
+    /// after those of its masters, which are looked for in `dirs`. A plugin is loaded only once.
+    pub fn load_plugin(&mut self, path: &Path, dirs: &[PathBuf], assets: &Assets) -> Result<()> {
+        let file = plugin_file(path);
+        if self.files.iter().any(|(loaded, _)| *loaded == file) {
+            return Ok(());
+        }
         let plugin = Plugin::from_path_filtered(path, |tag| {
             matches!(&tag, b"TES3" | b"STAT" | b"ACTI" | b"CONT" | b"DOOR" | b"LIGH" | b"CELL")
         })
         .with_context(|| format!("loading {}", path.display()))?;
+        let masters = masters_of(&plugin);
+        for master in &masters {
+            self.load_plugin(&find_file(dirs, master)?, dirs, assets)?;
+        }
+        let index = self.files.len() as u16;
+        self.files.push((file.clone(), masters.clone()));
+        self.visible.push(true);
 
         let mut define = |id: &str, mesh: &str| {
             if !mesh.is_empty() {
@@ -116,8 +153,12 @@ impl Objects {
                 continue;
             }
             for reference in cell.references.values() {
-                // Only what this plugin places itself; its changes to another plugin's objects are not followed.
-                if reference.mast_index != 0 || reference.deleted == Some(true) {
+                let Some(key) = reference_key(&file, &masters, reference) else { continue };
+                // A plugin that deletes or moves an object of an earlier one takes it from where it stood.
+                if let Some(&earlier) = self.by_reference.get(&key) {
+                    self.placed[earlier as usize].removed_by.push(index);
+                }
+                if reference.deleted == Some(true) {
                     continue;
                 }
                 let Some(mesh) = self.mesh_of.get(&reference.id.to_ascii_lowercase()) else { continue };
@@ -129,11 +170,14 @@ impl Objects {
                 let [x, y, z] = reference.rotation;
                 // The game turns objects clockwise, about X first, then Y, then Z.
                 let rotation = Mat3::from_rotation_z(-z) * Mat3::from_rotation_y(-y) * Mat3::from_rotation_x(-x);
+                self.by_reference.entry(key).or_insert(self.placed.len() as u32);
                 self.placed.push(Placed {
                     model,
                     position: Vec3::from(reference.translation),
                     matrix: rotation * reference.scale.unwrap_or(1.0),
                     rotation,
+                    plugin: index,
+                    removed_by: Vec::new(),
                 });
             }
         }
@@ -210,6 +254,9 @@ impl Objects {
         let mut shades: Vec<f32> = Vec::new();
         for &index in indices {
             let placed = &self.placed[index as usize];
+            if !self.visible[placed.plugin as usize] || placed.removed_by.iter().any(|&by| self.visible[by as usize]) {
+                continue;
+            }
             let Some(model) = &self.models[placed.model as usize] else { continue };
             for shape in &model.shapes {
                 points.clear();
