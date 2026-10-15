@@ -12,6 +12,9 @@ russian_data_files = [
   'D:\Mods\Russian\tr2609ru\data files',
   'D:\Mods\Russian\cyr2609ru\data files',
   'D:\Mods\Russian\sky2609ru\data files',
+  'D:\Mods\Russian\White Wolf of Lokken RUS\Data Files',
+  'D:\Mods\Russian\Solstheim Tomb of the Snow Prince RUS\Data Files',
+  'D:\Mods\Russian\Wyrmhaven RUS\Data Files',
 ]
 
 # One data directory per mod: the folder that holds its plugin files and its Textures folder.

@@ -5,9 +5,34 @@ interface Credit {
   name: string
   url?: string
   /** What it is to this Map. */
-  role: StringKey
+  role?: StringKey
   /** Words that come before the name. */
   lead?: StringKey
+  /** Who made it, put in place of `{author}` in the role. */
+  author?: { name: StringKey; url?: string }
+}
+
+function nameElement(text: string, url: string | undefined): HTMLElement {
+  if (!url) {
+    const strong = document.createElement('strong')
+    strong.textContent = text
+    return strong
+  }
+  const link = document.createElement('a')
+  link.href = url
+  link.target = '_blank'
+  link.rel = 'noopener'
+  link.textContent = text
+  return link
+}
+
+/** The role, with the author as a link when the author has one. */
+function roleNodes(credit: Credit): (string | Node)[] {
+  if (!credit.role) return []
+  if (!credit.author) return [` ${t(credit.role)}`]
+  const [before, after = ''] = t(credit.role, { author: '{author}' }).split('{author}')
+  const author = credit.author.url ? nameElement(t(credit.author.name), credit.author.url) : t(credit.author.name)
+  return [` ${before}`, author, after]
 }
 
 const CREDITS: { title: StringKey; entries: Credit[] }[] = [
@@ -37,9 +62,17 @@ const CREDITS: { title: StringKey; entries: Credit[] }[] = [
       { name: 'Morrowind', role: 'creditRussianMorrowind', lead: 'creditRussianMorrowindLead' },
       {
         name: 'Tamriel Rebuilt, Project Cyrodiil, Skyrim: Home of the Nords',
-        role: 'creditRussianMods',
-        lead: 'creditRussianModsLead',
+        role: 'creditTranslatedBy',
+        author: { name: 'authorMikhail', url: 'https://t.me/tamrielrus' },
       },
+      {
+        name: 'White Wolf of Lokken',
+        url: 'https://tesall.ru/files/file/14456-belyy-volk-gor-lokkena/',
+        role: 'creditRussianWhiteWolf',
+      },
+      { name: 'Solstheim Tomb of the Snow Prince', url: 'https://www.nexusmods.com/morrowind/mods/57012' },
+      { name: 'Wyrmhaven', url: 'https://www.nexusmods.com/morrowind/mods/55908' },
+      { name: 'Lyithdonea: The Azurian Isles', role: 'creditTranslatedBy', author: { name: 'authorGektorHoking' } },
     ],
   },
   {
@@ -67,18 +100,7 @@ function creditsDialog(): HTMLDialogElement {
       const list = document.createElement('ul')
       for (const credit of group.entries) {
         const item = document.createElement('li')
-        let name: HTMLElement
-        if (credit.url) {
-          const link = document.createElement('a')
-          link.href = credit.url
-          link.target = '_blank'
-          link.rel = 'noopener'
-          name = link
-        } else {
-          name = document.createElement('strong')
-        }
-        name.textContent = credit.name
-        item.append(credit.lead ? `${t(credit.lead)} ` : '', name, ` ${t(credit.role)}`)
+        item.append(credit.lead ? `${t(credit.lead)} ` : '', nameElement(credit.name, credit.url), ...roleNodes(credit))
         list.append(item)
       }
       dialog.append(title, list)
