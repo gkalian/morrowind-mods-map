@@ -73,6 +73,22 @@ To rebuild a part only:
 - `--locations-only` skips the tiles and rewrites the places, regions and doors only, with their Russian names.
 - `--area -3,-12,6,-5` renders the Cells inside west,south,east,north only, for trying things out.
 
+The build also creates transport data from the same plugins. To update only the transport data without rerendering the terrain, run:
+
+```
+cargo run --release --manifest-path pipeline/Cargo.toml -- transport
+```
+
+The map shows direct land, water, sky lantern, guild, magical and propylon services when enabled in the legend. It also includes confirmed restricted transport services from Tamriel Rebuilt. When Tribunal.esm is available, the departure to Mournhold appears at Ebonheart; the destination is an approximate point on the mainland backdrop, not a map of the city itself. Availability can depend on quests, scripts and the versions of the active mods; routes available only during a specific quest are omitted. The lines are schematic and do not show the actual route taken. Propylon links require the destination's index. If an enabled plugin includes the Master Index scripts or Folms Mirel's transport dialogue, confirmed journeys to and from Caldera are also shown. Other services implemented only in scripts or dialogue and carriers with an unrecognised service class are not inferred. Data for missing optional plugin sets is skipped. A map built before transport support keeps working without the transport layer.
+
+The route planner under Transport in the legend finds up to three transport alternatives between named locations or points picked on the map, using the enabled plugin sets and transport modes. It estimates walking as a straight line, allowing up to 8 cells to reach a stop and 1.5 cells for a transfer. It does not account for roads, terrain, water, travel costs, quest progress or items the player carries; route conditions are shown where known.
+
+When both Project Cyrodiil and Tamriel Rebuilt are enabled, the shipmaster for Anvil is shown in Old Ebonheart, as specified by the Cyrodiil installation script. Without Tamriel Rebuilt, the departure is shown in Ebonheart. The corresponding return service changes with the same selection.
+
+To include propylon script overrides, Folms Mirel's transport dialogue and intervention markers from a plugin that is not in `plugin-sets.toml`, put the plugin in one of the configured data directories and add `--propylon-addon` when regenerating transport data, for example `cargo run --release --manifest-path pipeline/Cargo.toml -- transport --propylon-addon MFR.esm`. To include it automatically in subsequent full and transport-only builds, add `transport_addons = ['MFR.esm']` to `paths.local.toml` before the `[mod_data_files]` section. Addons are applied after the enabled map modules for intervention markers; other changes in an addon are not included. The game files are read only.
+
+The Intervention section shows Almsivi and Divine Intervention markers from the enabled modules. Choose a named location or a point on the map to see both estimated destinations and enable either marker type to draw it. The calculation follows the exterior-cell spiral used by OpenMW; interior destinations, blocked teleportation, other plugins and changes made while playing can produce a different result. Mournhold's interior markers are not placed on the exterior map. If the transport data predates intervention support, regenerate it using the command above.
+
 The size and the time depend on `cell_pixels` in `plugin-sets.toml`, the pixels per game Cell at the deepest zoom. It is 1024; doubling it to 2048 gives sharper textures up close at roughly four times the size and three times the time.
 
 ### 3. Look at it

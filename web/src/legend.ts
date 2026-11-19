@@ -1,6 +1,8 @@
 import { t } from './i18n'
 import { kindPlural, type Kind, type Location } from './locations'
 import type { PluginSet } from './manifest'
+import { createTransportControls } from './transport'
+import type { TransportData, TransportMode } from './transport-data'
 
 /** What the viewer has switched on. */
 export interface Shown {
@@ -8,6 +10,7 @@ export interface Shown {
   kinds: Record<Kind, boolean>
   regionColours: boolean
   cellGrid: boolean
+  transport: Set<TransportMode>
 }
 
 export interface Legend {
@@ -62,10 +65,20 @@ export function createLegend(
   shown: Shown,
   onChange: () => void,
   onPick: (location: Location) => void,
+  transportData: TransportData | null,
+  transportFailed: boolean,
+  routePlanner?: HTMLElement,
+  intervention?: HTMLElement,
 ): Legend {
   const element = document.createElement('div')
   element.className = 'legend'
   const syncs: (() => void)[] = []
+  const modules = document.createElement('details')
+  modules.className = 'legend-modules'
+  modules.open = true
+  const modulesSummary = document.createElement('summary')
+  modulesSummary.textContent = t('legendModules')
+  modules.append(modulesSummary)
 
   for (const set of sets) {
     const block = document.createElement('div')
@@ -87,6 +100,7 @@ export function createLegend(
     const details = document.createElement('details')
     const summary = document.createElement('summary')
     summary.textContent = set.name
+    summary.title = set.version ? `${set.name} ${set.version}` : set.name
     if (set.version) {
       const version = document.createElement('small')
       version.textContent = set.version
@@ -101,9 +115,15 @@ export function createLegend(
     }
 
     block.append(toggle, details)
-    element.append(block)
+    modules.append(block)
   }
+  element.append(modules)
 
+  const display = document.createElement('details')
+  display.className = 'legend-display'
+  const displaySummary = document.createElement('summary')
+  displaySummary.textContent = t('legendDisplay')
+  display.append(displaySummary)
   const show = document.createElement('div')
   show.className = 'legend-show'
   const options = [
@@ -118,7 +138,22 @@ export function createLegend(
     show.append(option.row)
     syncs.push(option.sync)
   }
-  element.append(show)
+  display.append(show)
+  element.append(display)
+  if (transportData) element.append(createTransportControls(shown.transport, onChange, sets, transportData, routePlanner))
+  if (intervention) element.append(intervention)
+  if (transportFailed) {
+    const error = document.createElement('p')
+    error.className = 'transport-notice'
+    error.setAttribute('role', 'status')
+    error.textContent = t('transportLoadError')
+    const retry = document.createElement('button')
+    retry.type = 'button'
+    retry.textContent = t('transportRetry')
+    retry.addEventListener('click', () => window.location.reload())
+    error.append(' ', retry)
+    element.append(error)
+  }
 
   return { element, sync: () => syncs.forEach((sync) => sync()) }
 }

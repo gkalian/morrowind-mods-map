@@ -7,6 +7,7 @@ export interface Manifest {
   minZoom: number
   maxNativeZoom: number
   water: string
+  transport?: string | null
   sets: PluginSet[]
 }
 

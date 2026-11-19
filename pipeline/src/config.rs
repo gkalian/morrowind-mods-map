@@ -53,6 +53,8 @@ pub struct LocalPaths {
     /// Folders of the Russian releases of the game and the mods, for the Russian names of the Locations.
     #[serde(default)]
     pub russian_data_files: Vec<PathBuf>,
+    #[serde(default)]
+    pub transport_addons: Vec<String>,
 }
 
 impl SetsFile {

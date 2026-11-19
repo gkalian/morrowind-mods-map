@@ -13,3 +13,6 @@
 /web/public/data/
 /docs/
 /deploy/
+/.agent-browser/
+/web/vite.local.config.mjs
+/start-local.sh

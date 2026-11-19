@@ -4,12 +4,17 @@ import '@fontsource-variable/montserrat'
 import './style.css'
 import { createFooter } from './footer'
 import { applyToDocument, lang, onLangChange, setLang, t } from './i18n'
+import { createIntervention, type Intervention } from './intervention'
 import { LabelLayer } from './labels'
 import { createLegend, type Shown } from './legend'
+import { closeLegendInfoWithin } from './legend-info'
 import { kindName, loadLocations, localize, type Kind, type Location } from './locations'
 import { loadManifest, type Manifest, type PluginSet } from './manifest'
 import { cellGrid, regionTint } from './overlays'
 import { createSearch } from './search'
+import { createRoutePlanner, type RoutePlanner } from './route-planner'
+import { createTransportLayer, TRANSPORT_MODES } from './transport'
+import { loadTransport, type TransportMode } from './transport-data'
 
 /** How far past the deepest rendered zoom the Map may be magnified. */
 const EXTRA_ZOOM = 1
@@ -147,6 +152,12 @@ async function start(): Promise<void> {
   applyToDocument()
   const manifest = await loadManifest()
   const { all: locations, regionAreas, renamedBy, clearedBy } = await loadLocations(manifest)
+  let transportFailed = false
+  const transportData = await loadTransport(manifest).catch((error: unknown) => {
+    console.error(error)
+    transportFailed = true
+    return null
+  })
   document.documentElement.style.setProperty('--water', manifest.water)
 
   const map = L.map('map', {
@@ -165,7 +176,11 @@ async function start(): Promise<void> {
     kinds: { settlement: true, entrance: true, region: true },
     regionColours: new URLSearchParams(location.search).has('colours'),
     cellGrid: new URLSearchParams(location.search).has('grid'),
+    transport: new Set(new URLSearchParams(location.search).get('transport')?.split(',').filter((mode): mode is TransportMode => TRANSPORT_MODES.includes(mode as TransportMode)) ?? []),
   }
+  let routePlanner: RoutePlanner | undefined
+  let intervention: Intervention | undefined
+  const transportLayer = transportData ? createTransportLayer(map, transportData, manifest, locations, (stop) => routePlanner?.pickStop(stop) || intervention?.pickPoint(stop) || false) : null
 
   // Cells that each Plugin Set covers completely: its own, away from the faded edge of its land.
   const alwaysShown = new Set<string>()
@@ -265,10 +280,13 @@ async function start(): Promise<void> {
     else grid.remove()
 
     labels?.refresh()
+    transportLayer?.update(shown.sets, shown.transport)
+    intervention?.update()
   }
 
   function onLegendChange(): void {
     apply()
+    routePlanner?.refresh()
     const optional = manifest.sets.filter((set) => !set.locked && shown.sets.has(set.id)).map((set) => set.id)
     updateUrl((params) => {
       params.set('sets', optional.join(','))
@@ -276,6 +294,8 @@ async function start(): Promise<void> {
         if (on) params.set(key, '1')
         else params.delete(key)
       }
+      if (shown.transport.size) params.set('transport', [...shown.transport].join(','))
+      else params.delete('transport')
     })
   }
 
@@ -330,6 +350,7 @@ async function start(): Promise<void> {
     card.openOn(map)
     popup = card
     selected = place
+    intervention?.select(place)
     labels?.select(place)
     updateUrl((params) => params.set('loc', place.id))
     if (move) map.flyTo([place.y, place.x], Math.max(map.getZoom(), PICK_ZOOM[place.kind]))
@@ -337,10 +358,17 @@ async function start(): Promise<void> {
 
   let labels: LabelLayer | undefined
   apply()
-  labels = new LabelLayer(map, locations, isShown, (place) => select(place, false))
+  labels = new LabelLayer(map, locations, isShown, (place) => {
+    if (!routePlanner?.pickLocation(place) && !intervention?.pickLocation(place)) select(place, false)
+  })
 
-  const makeLegend = () =>
-    createLegend(manifest.sets.filter((set) => !set.backdropFor), locations, shown, onLegendChange, (place) => select(place, true))
+  if (transportLayer && transportData) {
+    routePlanner = createRoutePlanner(map, locations, () => transportLayer.routingNetwork(), () => shown.sets, () => shown.transport, (active) => transportLayer.setRouteFocus(active), () => intervention?.cancelPicking())
+    intervention = createIntervention(map, transportData, manifest, locations, () => shown.sets, () => routePlanner?.cancelPicking())
+  }
+  const makeLegend = () => {
+    return createLegend(manifest.sets.filter((set) => !set.backdropFor), locations, shown, onLegendChange, (place) => select(place, true), transportData, transportFailed, routePlanner?.element, intervention?.element)
+  }
   let legend = makeLegend()
 
   const panel = document.createElement('div')
@@ -373,15 +401,31 @@ async function start(): Promise<void> {
   document.body.append(panel, createFooter(manifest))
 
   onLangChange(() => {
+    closeLegendInfoWithin(legend.element)
     localize(locations)
     localize(regionAreas)
     labelButtons()
+    routePlanner?.localize()
+    intervention?.localize()
+    const transportOpen = legend.element.querySelector<HTMLDetailsElement>('.transport-options')?.open
+    const filtersOpen = legend.element.querySelector<HTMLDetailsElement>('.transport-filters')?.open
+    const modulesOpen = legend.element.querySelector<HTMLDetailsElement>('.legend-modules')?.open
+    const displayOpen = legend.element.querySelector<HTMLDetailsElement>('.legend-display')?.open
     // The legend is built anew in the other language and keeps whether it was folded away.
     const next = makeLegend()
     next.element.hidden = legend.element.hidden
+    const transport = next.element.querySelector<HTMLDetailsElement>('.transport-options')
+    const filters = next.element.querySelector<HTMLDetailsElement>('.transport-filters')
+    const modules = next.element.querySelector<HTMLDetailsElement>('.legend-modules')
+    const display = next.element.querySelector<HTMLDetailsElement>('.legend-display')
+    if (transport && transportOpen !== undefined) transport.open = transportOpen
+    if (filters && filtersOpen !== undefined) filters.open = filtersOpen
+    if (modules && modulesOpen !== undefined) modules.open = modulesOpen
+    if (display && displayOpen !== undefined) display.open = displayOpen
     legend.element.replaceWith(next.element)
     legend = next
     labels?.refresh()
+    transportLayer?.refresh()
     if (selected && popup?.isOpen()) popup.setContent(locationCard(selected))
     updateUrl((params) => params.set('lang', lang()))
   })

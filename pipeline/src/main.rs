@@ -6,6 +6,7 @@ mod objects;
 mod render;
 mod russian;
 mod tiles;
+mod transport;
 
 use std::collections::{HashMap, HashSet};
 use std::fs;
@@ -53,6 +54,16 @@ enum Command {
         #[arg(long, value_delimiter = ',', allow_hyphen_values = true)]
         area: Vec<i32>,
     },
+    Transport {
+        #[arg(long, default_value = ".")]
+        root: PathBuf,
+        #[arg(long, default_value = "web/public/data/transport")]
+        out: PathBuf,
+        #[arg(long, value_delimiter = ',')]
+        only: Vec<String>,
+        #[arg(long)]
+        propylon_addon: Vec<String>,
+    },
 }
 
 #[derive(Serialize)]
@@ -65,6 +76,7 @@ struct Manifest {
     min_zoom: u8,
     max_native_zoom: u8,
     water: String,
+    transport: Option<String>,
     sets: Vec<ManifestSet>,
 }
 
@@ -95,6 +107,7 @@ struct ManifestSet {
 fn main() -> Result<()> {
     match Cli::parse().command {
         Command::Build { root, out, locations_only, only, area } => build(&root, &root.join(out), locations_only, &only, &area),
+        Command::Transport { root, out, only, propylon_addon } => transport::build(&root, &root.join(out), &only, &propylon_addon),
     }
 }
 
@@ -125,6 +138,7 @@ fn build(root: &PathBuf, out: &PathBuf, locations_only: bool, only: &[String], a
         min_zoom: sets.min_zoom,
         max_native_zoom: sets.max_zoom(),
         water: format!("#{:02x}{:02x}{:02x}", sets.water[0], sets.water[1], sets.water[2]),
+        transport: None,
         sets: Vec::new(),
     };
     let mut entries: Vec<Option<ManifestSet>> = sets.sets.iter().map(|_| None).collect();
@@ -269,6 +283,8 @@ fn build(root: &PathBuf, out: &PathBuf, locations_only: bool, only: &[String], a
         println!("warning: texture {name} could not be loaded, drawn grey");
     }
 
+    transport::build(root, &out.join("transport"), &[], &[])?;
+    manifest.transport = Some("transport/index.json".to_string());
     fs::create_dir_all(out).with_context(|| format!("creating {}", out.display()))?;
     let manifest_path = out.join("manifest.json");
     fs::write(&manifest_path, serde_json::to_string(&manifest)?)
