@@ -1,5 +1,7 @@
 mod assets;
 mod config;
+#[cfg(test)]
+mod fixtures;
 mod land;
 mod locations;
 mod objects;
@@ -275,7 +277,7 @@ fn build(root: &PathBuf, out: &PathBuf, locations_only: bool, only: &[String], a
     // The Map shows a Plugin Set only where its tiles are: kept tiles may be missing or partial.
     for entry in entries.iter_mut() {
         let Some(set) = entry else { continue };
-        let drawn = with_tiles(&out.join(&set.tiles), &set.land);
+        let drawn = with_tiles(&out.join(&set.tiles), &set.land, set.max_native_zoom);
         if drawn.is_empty() {
             println!("warning: {} has no tiles in {}, left off the Map with its Locations", set.name, out.join(&set.tiles).display());
             *entry = None;
@@ -362,12 +364,15 @@ fn render_terrain(
     Ok(written)
 }
 
-/// The Cells, given as x, y, x, y, ..., that have a tile in the tile folder at the zoom where a Cell is one tile.
-fn with_tiles(tiles_dir: &Path, land: &[i32]) -> Vec<Grid> {
-    let zoom = tiles_dir.join(CELL_ZOOM.to_string());
+/// The Cells, given as x, y, x, y, ..., that have a tile in the tile folder: at the zoom where a
+/// Cell is one tile, or at the deepest zoom of a set drawn coarser than that, where a tile holds several.
+fn with_tiles(tiles_dir: &Path, land: &[i32], max_native_zoom: u8) -> Vec<Grid> {
+    let level = max_native_zoom.min(CELL_ZOOM);
+    let zoom = tiles_dir.join(level.to_string());
+    let shift = CELL_ZOOM - level;
     land.chunks_exact(2)
         .map(|pair| (pair[0], pair[1]))
-        .filter(|&(x, y)| zoom.join(x.to_string()).join(format!("{}.webp", -(y + 1))).is_file())
+        .filter(|&(x, y)| zoom.join((x >> shift).to_string()).join(format!("{}.webp", (-(y + 1)) >> shift)).is_file())
         .collect()
 }
 
@@ -397,3 +402,7 @@ fn manifest_set(set: &PluginSet, max_native_zoom: u8, cells: &[Grid], locations:
         land: cells.iter().flat_map(|grid| [grid.0, grid.1]).collect(),
     }
 }
+
+#[cfg(test)]
+#[path = "tests/main.rs"]
+mod tests;

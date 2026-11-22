@@ -222,3 +222,7 @@ pub fn run(root: &Path, out: &Path) -> Result<()> {
     );
     Ok(())
 }
+
+#[cfg(test)]
+#[path = "tests/transport_audit.rs"]
+mod tests;

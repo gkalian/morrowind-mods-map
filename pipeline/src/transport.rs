@@ -1024,3 +1024,7 @@ mod tests {
         fs::remove_file(path).unwrap();
     }
 }
+
+#[cfg(test)]
+#[path = "tests/transport.rs"]
+mod end_to_end;

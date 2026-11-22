@@ -133,3 +133,7 @@ impl World {
         id
     }
 }
+
+#[cfg(test)]
+#[path = "tests/land.rs"]
+mod tests;

@@ -1,0 +1,4 @@
+[alias]
+# Test coverage of the pipeline, its tests and test data left out: `cargo coverage --html --open`.
+# Needs `cargo install cargo-llvm-cov` and `rustup component add llvm-tools-preview` once.
+coverage = ["llvm-cov", "--locked", "--ignore-filename-regex", "src[\\\\/](tests[\\\\/]|fixtures\\.rs)"]

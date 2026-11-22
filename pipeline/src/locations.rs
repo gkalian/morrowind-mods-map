@@ -309,3 +309,7 @@ fn connected_parts(cells: &[Grid], diagonal: bool) -> Vec<Vec<Grid>> {
     }
     parts
 }
+
+#[cfg(test)]
+#[path = "tests/locations.rs"]
+mod tests;

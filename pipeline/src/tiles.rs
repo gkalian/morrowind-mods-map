@@ -114,3 +114,7 @@ pub fn build_levels(dir: &Path, mut quarters: HashMap<TileXY, Quarter>, zoom: u8
     }
     Ok(written)
 }
+
+#[cfg(test)]
+#[path = "tests/tiles.rs"]
+mod tests;

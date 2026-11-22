@@ -151,3 +151,7 @@ fn has_extension(path: &Path, extension: &str) -> bool {
 fn file_name_is(path: &Path, name: &str) -> bool {
     path.file_name().is_some_and(|found| found.eq_ignore_ascii_case(name))
 }
+
+#[cfg(test)]
+#[path = "tests/russian.rs"]
+mod tests;

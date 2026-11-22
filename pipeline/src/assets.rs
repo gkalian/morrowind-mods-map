@@ -96,3 +96,7 @@ impl Assets {
         None
     }
 }
+
+#[cfg(test)]
+#[path = "tests/assets.rs"]
+mod tests;

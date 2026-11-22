@@ -165,3 +165,7 @@ fn bordered_textures(world: &World, grid: Grid, cell: &CellLand) -> [[u16; TEX_S
     }
     out
 }
+
+#[cfg(test)]
+#[path = "tests/render.rs"]
+mod tests;

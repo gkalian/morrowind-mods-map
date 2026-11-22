@@ -495,3 +495,7 @@ fn read_image(assets: &Assets, file_name: &str) -> Option<Image> {
     }
     Some(Image { levels })
 }
+
+#[cfg(test)]
+#[path = "tests/objects.rs"]
+mod tests;

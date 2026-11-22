@@ -1,5 +1,7 @@
 # Checks for pull requests and for main. Nothing here builds the Map: that needs the game and the
-# mods, which are not on GitHub (ADR 0001 and 0002). The checks run the code's own tests instead.
+# mods, which are not on GitHub (ADR 0001 and 0002). The checks run the code's own tests instead,
+# on made-up game data, and report how much of the code they cover: a table in the summary of
+# the run, and the full report to download from it.
 name: Checks
 
 on:
@@ -25,11 +27,27 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: llvm-tools-preview
+      - uses: taiki-e/install-action@cargo-llvm-cov
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: pipeline
-      # Also checks plugin-sets.toml, the file the build reads.
-      - run: cargo test --locked
+      # The tests, also over plugin-sets.toml, the file the build reads; `coverage` is an alias
+      # in pipeline/.cargo/config.toml that leaves the tests themselves out of the report.
+      - run: cargo coverage --html
+      - name: Coverage summary
+        run: |
+          {
+            echo '### Pipeline coverage'
+            echo '```'
+            cargo coverage report --summary-only
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pipeline-coverage
+          path: pipeline/target/llvm-cov/html
 
   web:
     name: Site type check and tests
@@ -47,4 +65,16 @@ jobs:
       - run: npm ci
       # Also checks that the Russian dictionary has every key of the English one.
       - run: npx tsc --noEmit
-      - run: npm test
+      # The tests, with the coverage report in web/coverage.
+      - run: npm run coverage
+      - name: Coverage summary
+        run: |
+          node -e '
+            const total = require("./coverage/coverage-summary.json").total
+            const row = (name) => `| ${name} | ${total[name].pct}% | ${total[name].covered} / ${total[name].total} |`
+            console.log(["### Site coverage", "", "| | Covered | |", "|---|---|---|", ...["lines", "statements", "branches", "functions"].map(row)].join("\n"))
+          ' >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: site-coverage
+          path: web/coverage
