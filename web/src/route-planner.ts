@@ -1,12 +1,12 @@
 import L from 'leaflet'
-import { t } from './i18n'
+import { localName, t } from './i18n'
 import { kindName, type Location } from './locations'
 import { findLocations } from './search'
 import { findRoutes, type RouteOption, type RoutePoint } from './route-search'
-import { stopName, type SpecialLabel, type TransportMode, type TransportNetwork, type TransportStop } from './transport-data'
-import { transportName, transportNote } from './transport'
+import { createStopNamer, type TransportMode, type TransportNetwork, type TransportStop } from './transport-data'
+import { anchorName, transportName, transportNotes } from './transport'
 
-interface ChosenPoint extends RoutePoint { location?: Location; label?: SpecialLabel; stop?: TransportStop }
+interface ChosenPoint extends RoutePoint { location?: Location; stop?: TransportStop }
 type End = 'from' | 'to'
 
 export interface RoutePlanner {
@@ -71,16 +71,20 @@ export function createRoutePlanner(map: L.Map, locations: Location[], getNetwork
     list.style.top = `${flip ? rect.top - height - 4 : rect.bottom + 4}px`
   }
 
-  function pointName(point: ChosenPoint): string {
-    return point.location?.name ?? (point.label ? t(point.label) : point.stop ? stopName(point.stop, locations.filter((location) => getSets().has(location.set.id))) : t('cell', { x: Math.floor(point.x), y: Math.floor(point.y) }))
+  function stopLabel(stop: TransportStop): string {
+    return anchorName(stop) ?? createStopNamer(locations.filter((location) => getSets().has(location.set.id)), localName)(stop)
   }
 
-  function named(point: RoutePoint, network: TransportNetwork): string {
+  function pointName(point: ChosenPoint): string {
+    return point.location?.name ?? (point.stop ? stopLabel(point.stop) : t('cell', { x: Math.floor(point.x), y: Math.floor(point.y) }))
+  }
+
+  function named(point: RoutePoint, network: TransportNetwork, namer: (stop: TransportStop) => string): string {
     if (point === from || point === to) return pointName(point as ChosenPoint)
     const id = 'id' in point ? String(point.id) : ''
     const stop = network.stops.get(id)
     if (!stop) return t('cell', { x: Math.floor(point.x), y: Math.floor(point.y) })
-    return stop.label ? t(stop.label) : stopName(stop, locations.filter((location) => getSets().has(location.set.id)))
+    return anchorName(stop) ?? namer(stop)
   }
 
   function setPicking(next: End | null): void {
@@ -177,7 +181,7 @@ export function createRoutePlanner(map: L.Map, locations: Location[], getNetwork
     let matches: { point: ChosenPoint; name: string; detail: string }[] = []
     function show(): void {
       const query = input.value.trim().toLowerCase()
-      const special = query ? [...getNetwork().stops.values()].filter((stop) => stop.label && t(stop.label).toLowerCase().includes(query)).map((stop) => ({ point: { x: stop.x, y: stop.y, label: stop.label!, stopId: stop.id }, name: t(stop.label!), detail: t('routeApproximatePoint') })) : []
+      const special = query ? [...getNetwork().stops.values()].filter((stop) => stop.anchor && anchorName(stop)!.toLowerCase().includes(query)).map((stop) => ({ point: { x: stop.x, y: stop.y, stop, stopId: stop.id }, name: anchorName(stop)!, detail: t('routeApproximatePoint') })) : []
       const places = findLocations(locations.filter((item) => getSets().has(item.set.id) && item.kind !== 'region'), input.value).map((place) => ({ point: { x: place.x, y: place.y, location: place }, name: place.name, detail: `${kindName(place.kind)} · ${place.set.name}` }))
       matches = [...special, ...places].slice(0, 8)
       activeIndex = -1
@@ -366,6 +370,7 @@ export function createRoutePlanner(map: L.Map, locations: Location[], getNetwork
         list.append(button)
       })
       content.append(list)
+      const namer = createStopNamer(locations.filter((location) => getSets().has(location.set.id)), localName)
       const steps = document.createElement('ol')
       steps.className = 'route-steps'
       for (const step of options[selected].steps) {
@@ -374,18 +379,17 @@ export function createRoutePlanner(map: L.Map, locations: Location[], getNetwork
         const item = document.createElement('li')
         const title = document.createElement('span')
         title.textContent = step.route
-          ? `${transportName(step.route.mode)}: ${named(step.from, network)} → ${named(step.to, network)}`
-          : t('routeWalkStep', { from: named(step.from, network), to: named(step.to, network), distance: walking.toFixed(1) })
+          ? `${transportName(step.route.mode)}: ${named(step.from, network, namer)} → ${named(step.to, network, namer)}`
+          : t('routeWalkStep', { from: named(step.from, network, namer), to: named(step.to, network, namer), distance: walking.toFixed(1) })
         item.append(title)
         if (step.route?.provider) {
           const provider = document.createElement('small')
-          provider.textContent = t('transportProvider') + ': ' + step.route.provider
+          provider.textContent = t('transportProvider') + ': ' + localName(step.route.provider)
           item.append(provider)
         }
-        const noteKey = step.route && transportNote(step.route)
-        if (noteKey) {
+        for (const text of step.route ? transportNotes(step.route, network.stops) : []) {
           const note = document.createElement('small')
-          note.textContent = t(noteKey)
+          note.textContent = text
           item.append(note)
         }
         steps.append(item)
@@ -398,8 +402,8 @@ export function createRoutePlanner(map: L.Map, locations: Location[], getNetwork
   map.on('click', (event: L.LeafletMouseEvent) => {
     if (!picking) return
     const point = { x: event.latlng.lng, y: event.latlng.lat }
-    const special = [...getNetwork().stops.values()].find((stop) => stop.approximate && stop.label && Math.hypot(stop.x - point.x, stop.y - point.y) < 0.15)
-    choose(picking, special ? { x: special.x, y: special.y, label: special.label!, stopId: special.id } : point)
+    const special = [...getNetwork().stops.values()].find((stop) => stop.anchor && Math.hypot(stop.x - point.x, stop.y - point.y) < 0.15)
+    choose(picking, special ? { x: special.x, y: special.y, stop: special, stopId: special.id } : point)
   })
   document.addEventListener('keydown', (event) => {
     if (event.key === 'Escape' && picking) { setPicking(null); render() }
@@ -423,7 +427,7 @@ export function createRoutePlanner(map: L.Map, locations: Location[], getNetwork
     },
     pickStop(stop) {
       if (!picking) return false
-      choose(picking, { x: stop.x, y: stop.y, stop, label: stop.label ?? undefined, stopId: stop.approximate ? stop.id : undefined })
+      choose(picking, { x: stop.x, y: stop.y, stop, stopId: stop.approximate ? stop.id : undefined })
       return true
     },
     cancelPicking() { if (picking) { setPicking(null); render() } },

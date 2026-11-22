@@ -18,11 +18,13 @@ plugins = ["Tamriel.esm"]
 backdrop_for = ["tr", "pc", "shotn"]
 cell_pixels = 256
 
+# Tribunal is part of the base game here: Mournhold has no exterior of its own, but Tribunal
+# also adds the transport to and from it.
 [[set]]
 id = "morrowind"
 name = "Morrowind"
-plugins = ["Morrowind.esm"]
-archives = ["Morrowind.bsa"]
+plugins = ["Morrowind.esm", "Tribunal.esm"]
+archives = ["Morrowind.bsa", "Tribunal.bsa"]
 default_on = true
 locked = true
 
@@ -81,3 +83,24 @@ version = "0.3.1"
 plugins = ["MD_Azurian Isles.esm"]
 # The plugin by mistake names two Cells far from its islands Caldera and Sadrith Mora.
 ignore_cell_names = [[27, -52], [46, -50]]
+
+# Transport: what the transport data needs and the plugins do not say. Everything else (routes,
+# which mods a carrier needs, propylon links, conditions) is read from the plugins.
+# Keys are matched without regard to case; modes are land, water, air, guild, magic, propylon.
+[transport]
+# A character or creature with travel destinations is a carrier of this mode, by its class.
+# The build lists the carriers whose class is not here; they are left out.
+classes = { "Shipmaster" = "water", "Gondolier" = "water", "T_Mw_RiverstriderService" = "water", "T_Glb_Fisherman" = "water", "Caravaner" = "land", "Slave" = "land", "Guild Guide" = "guild" }
+# Carriers whose class does not tell the mode, by their id.
+actors = { "TR_m7_Relenu Drolan" = "air", "TR_m7_Ulath-Bael" = "air", "TR_m4_Nassuran Omoril" = "land", "TR_m1_DaedrothGindaman" = "guild", "Blatta Hateria" = "water", "vevrana aryon" = "water", "rindral dralor" = "water" }
+# An activator script that moves the player while the player carries one of these items is a
+# route of this mode; `*` at the end matches any ending.
+gates = { "index_*" = "propylon", "T_De_Index_*" = "propylon" }
+# Dialogue topics in which a character moves the player as a transport service. Other answers
+# that move the player are quest events and are left out.
+topics = { "transport to Mournhold" = "magic", "transport to Vvardenfell" = "magic" }
+
+# Mournhold is all interiors; the Map shows it at this point on the old landmass of the backdrop.
+[[transport.anchor]]
+cells = "Mournhold"
+position = [23.5, -27.5]

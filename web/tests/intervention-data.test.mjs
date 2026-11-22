@@ -17,14 +17,12 @@ test('uses the exterior-cell spiral, including negative cells and ties', () => {
   assert.deepEqual(closestIntervention(markers, 'divine', { x: 0, y: 0 }), [])
 })
 
-test('applies enabled modules and later addon overrides without leaking interiors', () => {
+test('applies enabled modules in load order without leaking interiors', () => {
   const manifest = { cellSize: 8192, sets: [{ id: 'base' }, { id: 'tr' }] }
   const data = { sets: new Map([
-    ['base', { interventionReferences: [ref('base:1', 'templemarker', 0, 0), ref('base:2', 'divinemarker', 0, 0, { cell: 'mournhold' })], interventionAddons: [{ name: 'mfr.esm', references: [ref('base:1', 'templemarker', 3, 4), ref('mfr.esm:1', 'divinemarker', 1, 2), ref('tr:9', 'templemarker', 4, 4)] }] }],
-    ['tr', { interventionReferences: [ref('tr:9', 'templemarker', 7, 8), ref('base:1', 'templemarker', 1, 1)] }],
+    ['base', { interventionReferences: [ref('base:1', 'templemarker', 0, 0), ref('base:2', 'divinemarker', 0, 0, { cell: 'mournhold' }), ref('base:3', 'divinemarker', 1, 2)] }],
+    ['tr', { interventionReferences: [ref('tr:9', 'templemarker', 7, 8), ref('base:1', 'templemarker', 1, 1), ref('base:3', 'divinemarker', 1, 2, { deleted: true })] }],
   ]) }
-  assert.deepEqual(interventionMarkers(data, manifest, new Set(['base'])).map((m) => [m.key, m.x]), [['base:1', 3], ['mfr.esm:1', 1]])
-  assert.deepEqual(interventionMarkers(data, manifest, new Set(['base', 'tr'])).map((m) => [m.key, m.x]), [['base:1', 3], ['tr:9', 4], ['mfr.esm:1', 1]])
-  data.sets.get('base').interventionAddons[0].references[0].deleted = true
-  assert.ok(!interventionMarkers(data, manifest, new Set(['base'])).some((m) => m.key === 'base:1'))
+  assert.deepEqual(interventionMarkers(data, manifest, new Set(['base'])).map((m) => [m.key, m.x]), [['base:1', 0], ['base:3', 1]])
+  assert.deepEqual(interventionMarkers(data, manifest, new Set(['base', 'tr'])).map((m) => [m.key, m.x]), [['base:1', 1], ['tr:9', 7]])
 })

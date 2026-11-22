@@ -1,9 +1,9 @@
 import L from 'leaflet'
-import { t, type StringKey } from './i18n'
+import { localName, t } from './i18n'
 import { createLegendInfo } from './legend-info'
 import type { Location } from './locations'
 import type { Manifest, PluginSet } from './manifest'
-import { buildTransport, stopName, type TransportData, type TransportMode, type TransportNetwork, type TransportRoute, type TransportStop } from './transport-data'
+import { buildTransport, createStopNamer, type TransportData, type TransportMode, type TransportNetwork, type TransportRoute, type TransportStop } from './transport-data'
 
 const COLORS: Record<TransportMode, string> = { land: '#b56232', water: '#2886b5', air: '#489774', guild: '#a05cb0', magic: '#ce69a6', propylon: '#d1a52d' }
 const NAMES: Record<TransportMode, 'transportLand' | 'transportWater' | 'transportAir' | 'transportGuild' | 'transportMagic' | 'transportPropylon'> = { land: 'transportLand', water: 'transportWater', air: 'transportAir', guild: 'transportGuild', magic: 'transportMagic', propylon: 'transportPropylon' }
@@ -13,20 +13,22 @@ export function transportName(mode: TransportMode): string {
   return t(NAMES[mode])
 }
 
-export function transportNote(route: TransportRoute): StringKey | null {
-  if (route.condition) {
-    const names = { folmsMaster: 'transportFolmsMaster', folms: 'transportFolms', mournhold: 'transportMournholdDetails', mournholdReturn: 'transportMournholdReturn' } as const
-    return names[route.condition]
+/** The name of a stop that stands for a place without an exterior. */
+export function anchorName(stop: TransportStop): string | null {
+  return stop.anchor ? t('transportApproximate', { name: localName(stop.anchor) }) : null
+}
+
+/** What the viewer should know about a route, from the plugins: items, conditions, approximate ends. */
+export function transportNotes(route: TransportRoute, stops?: Map<string, TransportStop>): string[] {
+  const notes: string[] = []
+  if (route.items?.length) notes.push(t('transportNeedsItem', { items: route.items.map(localName).join(', ') }))
+  if (route.dialogue) notes.push(t('transportDialogue'))
+  if (route.conditional) notes.push(t('transportConditional'))
+  for (const id of [route.from, route.to]) {
+    const anchor = stops?.get(id)?.anchor
+    if (anchor) notes.push(t('transportAnchorNote', { name: localName(anchor) }))
   }
-  if (route.requiredIndex) {
-    const index = route.requiredIndex.toLowerCase()
-    return index === 'index_master' ? 'transportPropylonMasterRequired' : index.startsWith('t_de_index_') ? 'transportPropylonOwnIndex' : 'transportPropylonRequired'
-  }
-  if (route.mode === 'air') return 'transportSkyRestricted'
-  if (['tr_m4_nassuran omoril', 'tr_m4_othrys rorivel'].includes(route.providerId)) return 'transportQuestRestricted'
-  if (['blatta hateria', 'vevrana aryon'].includes(route.providerId)) return 'transportHolamayan'
-  if (route.providerId === 'veresa alver') return 'transportRavenRock'
-  return route.script ? 'transportConditional' : null
+  return notes
 }
 
 export function createTransportControls(modes: Set<TransportMode>, onChange: () => void, sets: PluginSet[], data: TransportData, planner?: HTMLElement): HTMLElement {
@@ -101,8 +103,9 @@ export function createTransportControls(modes: Set<TransportMode>, onChange: () 
 export function createTransportLayer(map: L.Map, data: TransportData, manifest: Manifest, locations: Location[], onPickStop: (stop: TransportStop) => boolean = () => false) {
   const lines = L.layerGroup().addTo(map)
   const markers = L.layerGroup().addTo(map)
-  const masterPane = map.createPane('transportMaster')
-  masterPane.style.zIndex = '625'
+  // Magic stops stand above the others, as few lines lead to them.
+  const topPane = map.createPane('transportTop')
+  topPane.style.zIndex = '625'
   let network: TransportNetwork = { stops: new Map(), routes: [] }
   let visible = new Set<TransportMode>()
   let selected: string | null = null
@@ -114,7 +117,7 @@ export function createTransportLayer(map: L.Map, data: TransportData, manifest: 
   function covered(stop: TransportStop): boolean {
     const x = Math.floor(stop.x)
     const y = Math.floor(stop.y)
-    if (stop.approximate && backdropLand.has(`${x},${y}`)) return true
+    if (stop.anchor && backdropLand.has(`${x},${y}`)) return true
     for (let dy = -1; dy <= 1; dy++) {
       for (let dx = -1; dx <= 1; dx++) {
         if (land.has(`${x + dx},${y + dy}`)) return true
@@ -127,7 +130,6 @@ export function createTransportLayer(map: L.Map, data: TransportData, manifest: 
     lines.clearLayers()
     markers.clearLayers()
     const routes = network.routes.filter((route) => visible.has(route.mode))
-    const masterStops = new Set(routes.filter((route) => route.requiredIndex?.toLowerCase() === 'index_master').map((route) => route.to))
     const directions = new Set(routes.map((route) => `${route.mode}|${route.from}|${route.to}`))
     const included = new Set<string>()
     const drawn = new Set<string>()
@@ -158,15 +160,16 @@ export function createTransportLayer(map: L.Map, data: TransportData, manifest: 
         L.marker([(from.y + to.y) / 2, (from.x + to.x) / 2], { icon: arrow, interactive: false, keyboard: false, opacity: routeFocus ? 0.4 : 0.8 }).addTo(lines)
       }
     }
-    const currentLocations = locations.filter((location) => enabledSets.has(location.set.id))
-    const displayName = (stop: TransportStop) => stop.label ? t(stop.label) : stopName(stop, currentLocations)
+    const namer = createStopNamer(locations.filter((location) => enabledSets.has(location.set.id)), localName)
+    const displayName = (stop: TransportStop) => anchorName(stop) ?? namer(stop)
+    const backdrops = manifest.sets.filter((set) => set.backdropFor).flatMap((set) => set.backdropFor ?? [])
+    const backdropNames = manifest.sets.filter((set) => backdrops.includes(set.id)).map((set) => set.name).join(', ')
     for (const id of included) {
       const stop = network.stops.get(id)!
       const mode = [...stop.modes].find((candidate) => visible.has(candidate)) ?? 'land'
-      const isMasterStop = masterStops.has(id)
       const marker = L.circleMarker([stop.y, stop.x], {
-        radius: isMasterStop ? 8 : mode === 'magic' || selected === id ? 7 : 5, color: COLORS[mode], weight: isMasterStop ? 3 : 2,
-        fillColor: '#fff', fillOpacity: 0.95, pane: isMasterStop || mode === 'magic' ? 'transportMaster' : 'overlayPane',
+        radius: mode === 'magic' || selected === id ? 7 : 5, color: COLORS[mode], weight: 2,
+        fillColor: '#fff', fillOpacity: 0.95, pane: mode === 'magic' ? 'transportTop' : 'overlayPane',
       }).addTo(markers)
       markerById.set(id, marker)
       const name = displayName(stop)
@@ -182,7 +185,7 @@ export function createTransportLayer(map: L.Map, data: TransportData, manifest: 
         const departures = routes.filter((route) => route.from === id)
         if (!departures.length) {
           const empty = document.createElement('div')
-          empty.textContent = t(stop.approximate ? 'transportMournholdReturn' : 'transportNoDepartures')
+          empty.textContent = stop.anchor ? t('transportAnchorNote', { name: localName(stop.anchor) }) : t('transportNoDepartures')
           content.append(empty)
         }
         for (const route of departures) {
@@ -203,18 +206,17 @@ export function createTransportLayer(map: L.Map, data: TransportData, manifest: 
           item.append(text)
           if (route.provider) {
             const provider = document.createElement('small')
-            provider.textContent = `${t('transportProvider')}: ${route.provider}`
+            provider.textContent = `${t('transportProvider')}: ${localName(route.provider)}`
             item.append(provider)
           }
-          const noteKey = transportNote(route)
-          if (noteKey) {
+          for (const text of transportNotes(route, network.stops)) {
             const note = document.createElement('small')
-            note.textContent = t(noteKey)
+            note.textContent = text
             item.append(note)
           }
           if (!inside) {
             const outside = document.createElement('small')
-            outside.textContent = t(target.approximate ? 'transportBackdropRequired' : 'transportOutside')
+            outside.textContent = target.anchor ? t('transportBackdropRequired', { modules: backdropNames }) : t('transportOutside')
             item.append(outside)
           }
           content.append(item)

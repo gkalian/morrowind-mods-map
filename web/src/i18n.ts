@@ -62,3 +62,8 @@ export function applyToDocument(): void {
   document.documentElement.lang = current
   document.title = t('title')
 }
+
+/** A name from the plugins in the current language: the Russian one falls back to the English. */
+export function localName(named: { name: string; ru?: string }): string {
+  return (current === 'ru' && named.ru) || named.name
+}

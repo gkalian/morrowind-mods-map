@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
 use encoding_rs::{WINDOWS_1251, WINDOWS_1252};
-use tes3::esp::{Plugin, Region};
+use tes3::esp::{Creature, MiscItem, Npc, Plugin, Region};
 
 use crate::config::SetsFile;
 use crate::locations::Locations;
@@ -21,6 +21,18 @@ pub struct Russian {
     cells: HashMap<String, String>,
     /// By Region id in lower case.
     regions: HashMap<String, String>,
+    /// Names of characters and creatures, by id in lower case.
+    actors: HashMap<String, String>,
+    /// Names of miscellaneous items, by id in lower case.
+    items: HashMap<String, String>,
+}
+
+/// The plugin reader takes every text for Windows-1252; turned back into bytes, it is Windows-1251.
+/// `None` when the text has no Cyrillic in it, as where a mod's Russian plugin keeps an English name.
+fn cyrillic(text: &str) -> Option<String> {
+    let (bytes, _, _) = WINDOWS_1252.encode(text);
+    let (name, _, _) = WINDOWS_1251.decode(&bytes);
+    name.chars().any(|c| ('\u{0400}'..='\u{04ff}').contains(&c)).then(|| name.into_owned())
 }
 
 impl Russian {
@@ -38,8 +50,8 @@ impl Russian {
             }
             for plugin in sets.sets.iter().flat_map(|set| &set.plugins) {
                 let Some(path) = files.iter().find(|path| file_name_is(path, plugin)) else { continue };
-                let count = russian.read_regions(path)?;
-                println!("russian names: {}, {count} regions", path.display());
+                let count = russian.read_plugin(path)?;
+                println!("russian names: {}, {count} regions, characters and items", path.display());
             }
         }
         Ok(russian)
@@ -60,21 +72,44 @@ impl Russian {
         Ok(count)
     }
 
-    fn read_regions(&mut self, path: &Path) -> Result<usize> {
-        let plugin = Plugin::from_path_filtered(path, |tag| matches!(&tag, b"TES3" | b"REGN"))
+    fn read_plugin(&mut self, path: &Path) -> Result<usize> {
+        let plugin = Plugin::from_path_filtered(path, |tag| matches!(&tag, b"TES3" | b"REGN" | b"NPC_" | b"CREA" | b"MISC"))
             .with_context(|| format!("loading {}", path.display()))?;
         let mut count = 0;
-        for region in plugin.objects_of_type::<Region>() {
-            // The plugin reader takes every text for Windows-1252; turned back into bytes, it is Windows-1251.
-            let (bytes, _, _) = WINDOWS_1252.encode(&region.name);
-            let (name, _, _) = WINDOWS_1251.decode(&bytes);
-            // A mod's Russian plugin keeps the English Region names.
-            if name.chars().any(|c| ('\u{0400}'..='\u{04ff}').contains(&c)) {
-                self.regions.entry(region.id.to_ascii_lowercase()).or_insert_with(|| name.into_owned());
+        let mut add = |table: &mut HashMap<String, String>, id: &str, name: &str| {
+            if let Some(name) = cyrillic(name) {
+                table.entry(id.to_ascii_lowercase()).or_insert(name);
                 count += 1;
             }
+        };
+        for region in plugin.objects_of_type::<Region>() {
+            add(&mut self.regions, &region.id, &region.name);
+        }
+        for npc in plugin.objects_of_type::<Npc>() {
+            add(&mut self.actors, &npc.id, &npc.name);
+        }
+        for creature in plugin.objects_of_type::<Creature>() {
+            add(&mut self.actors, &creature.id, &creature.name);
+        }
+        for item in plugin.objects_of_type::<MiscItem>() {
+            add(&mut self.items, &item.id, &item.name);
         }
         Ok(count)
+    }
+
+    /// The Russian name of a character or creature.
+    pub fn actor(&self, id: &str) -> Option<String> {
+        self.actors.get(&id.to_ascii_lowercase()).cloned()
+    }
+
+    /// The Russian name of a miscellaneous item.
+    pub fn item(&self, id: &str) -> Option<String> {
+        self.items.get(&id.to_ascii_lowercase()).cloned()
+    }
+
+    /// The Russian name of a Cell or place, from the `.cel` files.
+    pub fn place(&self, english: &str) -> Option<String> {
+        self.cell(english)
     }
 
     fn cell(&self, english: &str) -> Option<String> {

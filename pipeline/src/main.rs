@@ -7,6 +7,7 @@ mod render;
 mod russian;
 mod tiles;
 mod transport;
+mod transport_audit;
 
 use std::collections::{HashMap, HashSet};
 use std::fs;
@@ -61,8 +62,13 @@ enum Command {
         out: PathBuf,
         #[arg(long, value_delimiter = ',')]
         only: Vec<String>,
+    },
+    /// Writes a report of the plugin records that transport data is derived from, for checking.
+    TransportAudit {
+        #[arg(long, default_value = ".")]
+        root: PathBuf,
         #[arg(long)]
-        propylon_addon: Vec<String>,
+        out: PathBuf,
     },
 }
 
@@ -107,7 +113,13 @@ struct ManifestSet {
 fn main() -> Result<()> {
     match Cli::parse().command {
         Command::Build { root, out, locations_only, only, area } => build(&root, &root.join(out), locations_only, &only, &area),
-        Command::Transport { root, out, only, propylon_addon } => transport::build(&root, &root.join(out), &only, &propylon_addon),
+        Command::Transport { root, out, only } => {
+            let sets = SetsFile::load(&root.join("plugin-sets.toml"))?;
+            let paths = LocalPaths::load(&root.join("paths.local.toml"))?;
+            let russian = Russian::load(&paths.russian_data_files, &sets)?;
+            transport::build(&root, &root.join(out), &only, &russian)
+        }
+        Command::TransportAudit { root, out } => transport_audit::run(&root, &out),
     }
 }
 
@@ -283,8 +295,11 @@ fn build(root: &PathBuf, out: &PathBuf, locations_only: bool, only: &[String], a
         println!("warning: texture {name} could not be loaded, drawn grey");
     }
 
-    transport::build(root, &out.join("transport"), &[], &[])?;
-    manifest.transport = Some("transport/index.json".to_string());
+    // Transport is an extra: when it fails, the Map is still written, without it.
+    match transport::build(root, &out.join("transport"), &[], &russian) {
+        Ok(()) => manifest.transport = Some("transport/index.json".to_string()),
+        Err(error) => println!("warning: transport data was not written: {error:#}"),
+    }
     fs::create_dir_all(out).with_context(|| format!("creating {}", out.display()))?;
     let manifest_path = out.join("manifest.json");
     fs::write(&manifest_path, serde_json::to_string(&manifest)?)

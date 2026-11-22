@@ -7,20 +7,11 @@ export interface InterventionPoint { x: number; y: number }
 
 export function interventionMarkers(data: TransportData, manifest: Manifest, enabled: Set<string>): InterventionMarker[] {
   const references = new Map<string, TransportReference>()
-  const addons: { name: string; references: TransportReference[] }[] = []
   for (const set of manifest.sets) {
     if (!enabled.has(set.id)) continue
     const group = data.sets.get(set.id)
     if (!group) continue
     for (const ref of group.interventionReferences ?? []) {
-      if (ref.deleted) references.delete(ref.key)
-      else references.set(ref.key, ref)
-    }
-    addons.push(...(group.interventionAddons ?? []))
-  }
-  for (const addon of addons) {
-    for (const ref of addon.references) {
-      if (!references.has(ref.key) && !ref.key.startsWith(`${addon.name.toLowerCase()}:`)) continue
       if (ref.deleted) references.delete(ref.key)
       else references.set(ref.key, ref)
     }

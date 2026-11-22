@@ -12,6 +12,7 @@ import { kindName, loadLocations, localize, type Kind, type Location } from './l
 import { loadManifest, type Manifest, type PluginSet } from './manifest'
 import { cellGrid, regionTint } from './overlays'
 import { createSearch } from './search'
+import { updateUrl } from './url'
 import { createRoutePlanner, type RoutePlanner } from './route-planner'
 import { createTransportLayer, TRANSPORT_MODES } from './transport'
 import { loadTransport, type TransportMode } from './transport-data'
@@ -115,11 +116,6 @@ function setsFromUrl(manifest: Manifest): Set<string> {
   )
 }
 
-function updateUrl(change: (params: URLSearchParams) => void): void {
-  const params = new URLSearchParams(location.search)
-  change(params)
-  history.replaceState(null, '', `?${params}`)
-}
 
 function locationCard(place: Location): HTMLElement {
   const card = document.createElement('div')
@@ -151,13 +147,15 @@ function locationCard(place: Location): HTMLElement {
 async function start(): Promise<void> {
   applyToDocument()
   const manifest = await loadManifest()
-  const { all: locations, regionAreas, renamedBy, clearedBy } = await loadLocations(manifest)
+  // Transport data loads together with the Locations, not after them.
   let transportFailed = false
-  const transportData = await loadTransport(manifest).catch((error: unknown) => {
+  const transportLoading = loadTransport(manifest).catch((error: unknown) => {
     console.error(error)
     transportFailed = true
     return null
   })
+  const { all: locations, regionAreas, renamedBy, clearedBy } = await loadLocations(manifest)
+  const transportData = await transportLoading
   document.documentElement.style.setProperty('--water', manifest.water)
 
   const map = L.map('map', {

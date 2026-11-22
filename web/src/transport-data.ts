@@ -1,29 +1,58 @@
 import type { Manifest } from './manifest'
 import type { Location } from './locations'
 
+/** Version of the transport files this viewer reads; the pipeline writes it into the index. */
+export const TRANSPORT_SCHEMA = 2
+
 export type TransportMode = 'land' | 'water' | 'air' | 'guild' | 'magic' | 'propylon'
+/** A name in English, and in Russian where the Russian release has one. */
+export interface Named { name: string; ru?: string }
 export interface Destination { position: [number, number, number]; cell: string }
-export interface Actor { id: string; name: string; class: string; script: string; deleted: boolean; destinations: Destination[] }
+export interface Actor extends Named { id: string; mode: TransportMode | null; script: string; deleted: boolean; destinations: Destination[] }
 export interface TransportReference { key: string; actor: string; cell: string; position: [number, number, number]; deleted: boolean; destination: Destination | null; location?: string }
-export interface PropylonActivator { id: string; script: string; deleted: boolean }
-export interface PropylonScript { id: string; destination: Destination | null; masterDestination?: Destination | null; requiredIndex: string | null; deleted: boolean }
-export type SpecialLabel = 'transportMournhold'
-export interface SpecialRoute { actor: string; from: Destination | null; to: Destination; mode: 'magic' | 'propylon'; condition: 'folmsMaster' | 'folms' | 'mournhold' | 'mournholdReturn'; fromLabel?: SpecialLabel | null; toLabel?: SpecialLabel | null }
-export interface TransportChanges { actors: Actor[]; references: TransportReference[]; activators?: PropylonActivator[]; propylonScripts?: PropylonScript[]; specialRoutes?: SpecialRoute[]; interventionReferences?: TransportReference[]; interventionAddons?: { name: string; references: TransportReference[] }[]; conditionalRelocations?: { actor: string; requiredSet: string; position: [number, number, number] }[] }
-export interface TransportData { sets: Map<string, TransportChanges> }
-export interface TransportStop { id: string; x: number; y: number; interior: string; modes: Set<TransportMode>; provider: string; script: string; label?: SpecialLabel | null; approximate?: boolean }
-export interface TransportRoute { from: string; to: string; mode: TransportMode; provider: string; providerId: string; script: string; requiredIndex?: string; condition?: SpecialRoute['condition'] }
+export interface ActivatorRecord { id: string; script: string; deleted: boolean }
+export interface Gate { to: Destination; items: string[]; mode: TransportMode }
+export interface ScriptRecord { id: string; deleted: boolean; requires?: string[]; excludedBy?: string[]; conditional?: boolean; moves?: { actor: string; set: string; to: Destination }[]; gates?: Gate[] }
+export interface DialogueRoute { actor: string; topic: string; mode: TransportMode; to: Destination; items?: string[] }
+export interface TransportChanges { actors: Actor[]; references: TransportReference[]; activators: ActivatorRecord[]; scripts: ScriptRecord[]; dialogue: DialogueRoute[]; interventionReferences: TransportReference[] }
+/** A place that exists only as interiors, shown at one point. Position in Cells. */
+export interface Anchor extends Named { cells: string; x: number; y: number }
+export interface TransportData { sets: Map<string, TransportChanges>; anchors: Anchor[]; items: Map<string, Named> }
+export interface TransportStop {
+  id: string
+  x: number
+  y: number
+  interior: string
+  modes: Set<TransportMode>
+  provider?: Named
+  /** The place without an exterior that the stop stands for. */
+  anchor?: Anchor
+  /** Its position is the anchor's, not a real one: no walking to or from it. */
+  approximate?: boolean
+}
+export interface TransportRoute {
+  from: string
+  to: string
+  mode: TransportMode
+  provider?: Named
+  providerId: string
+  /** Items the player has to carry. */
+  items?: Named[]
+  /** The carrier comes and goes with the game, such as the stage of a quest. */
+  conditional?: boolean
+  /** Offered in conversation rather than as a travel service. */
+  dialogue?: boolean
+}
 export interface TransportNetwork { stops: Map<string, TransportStop>; routes: TransportRoute[] }
 
-const REQUIRED_SETS: Record<string, string> = { pc_m1_annineshotn: 'shotn', pc_m1_kaltandoralistr: 'tr', sky_xre_kw_cascus: 'pc' }
-const EXCLUDED_SETS: Record<string, string> = { pc_m1_kaltandoralis: 'tr' }
+type Point = [number, number, number]
 
 export async function loadTransport(manifest: Manifest): Promise<TransportData | null> {
   if (!manifest.transport) return null
   const response = await fetch(`data/${manifest.transport}`)
   if (!response.ok) throw new Error(`Transport index: ${response.status}`)
-  const index = await response.json() as { schemaVersion: number; sets: string[] }
-  if (index.schemaVersion !== 1 || !Array.isArray(index.sets)) throw new Error('Invalid transport index')
+  const index = await response.json() as { schemaVersion: number; sets: string[]; anchors?: Anchor[]; items?: Record<string, Named> }
+  if (index.schemaVersion !== TRANSPORT_SCHEMA || !Array.isArray(index.sets)) throw new Error('Transport data is from another version; regenerate it')
   const root = manifest.transport.slice(0, manifest.transport.lastIndexOf('/') + 1)
   const groups = await Promise.all(manifest.sets.filter((set) => index.sets.includes(set.id)).map(async (set) => {
     const file = await fetch(`data/${root}${encodeURIComponent(set.id)}.json`)
@@ -32,27 +61,15 @@ export async function loadTransport(manifest: Manifest): Promise<TransportData |
     if (!Array.isArray(changes.actors) || !Array.isArray(changes.references)) throw new Error('Invalid transport data')
     return [set.id, changes] as const
   }))
-  return { sets: new Map(groups) }
-}
-
-export function modeOf(actor: Actor): TransportMode | null {
-  const value = actor.class.toLowerCase()
-  const id = actor.id.toLowerCase()
-  if (['tr_m7_relenu drolan', 'tr_m7_ulath-bael'].includes(id)) return 'air'
-  if (id === 'tr_m4_nassuran omoril') return 'land'
-  if (value === 'guild guide' || id === 'tr_m1_daedrothgindaman') return 'guild'
-  if (value === 'shipmaster' || value === 'gondolier' || value === 't_mw_riverstriderservice' || value === 't_glb_fisherman' || ['blatta hateria', 'vevrana aryon', 'rindral dralor', 'tr_m3_torosi moren'].includes(id)) return 'water'
-  if (value === 'caravaner') return /skylamp/i.test(actor.name + ' ' + actor.id + ' ' + actor.script) ? null : 'land'
-  if (value === 'slave' && /fasttravelslave/i.test(actor.script)) return 'land'
-  return null
+  return { sets: new Map(groups), anchors: index.anchors ?? [], items: new Map(Object.entries(index.items ?? {})) }
 }
 
 function distance(a: readonly number[], b: readonly number[]): number {
   return Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2])
 }
 
-function exterior(cell: string, position: [number, number, number], doors: Map<string, TransportReference[]>): [number, number, number] | null {
-  if (!cell) return position
+/** Follows doors from an interior, nearest first, to where they come out in the exterior. */
+function exterior(cell: string, position: Point, doors: Map<string, TransportReference[]>): Point | null {
   const queue = [{ cell, position }]
   const seen = new Set<string>()
   while (queue.length) {
@@ -69,131 +86,202 @@ function exterior(cell: string, position: [number, number, number], doors: Map<s
   return null
 }
 
+/** Applies the enabled Plugin Sets in load order, as the game does, and builds the routes. */
 export function buildTransport(data: TransportData, manifest: Manifest, enabled: Set<string>): TransportNetwork {
   const actors = new Map<string, Actor>()
   const references = new Map<string, TransportReference>()
-  const activators = new Map<string, PropylonActivator>()
-  const scripts = new Map<string, PropylonScript>()
-  const specialRoutes: SpecialRoute[] = []
-  const relocations = new Map<string, [number, number, number]>()
+  const activators = new Map<string, ActivatorRecord>()
+  const scripts = new Map<string, ScriptRecord>()
+  const dialogue: DialogueRoute[] = []
+  const apply = <T>(target: Map<string, T>, items: T[] | undefined, key: (item: T) => string, deleted: (item: T) => boolean) => {
+    for (const item of items ?? []) {
+      if (deleted(item)) target.delete(key(item))
+      else target.set(key(item), item)
+    }
+  }
   for (const set of manifest.sets) {
     if (!enabled.has(set.id)) continue
     const changes = data.sets.get(set.id)
     if (!changes) continue
-    for (const actor of changes.actors) {
-      if (actor.deleted) actors.delete(actor.id)
-      else actors.set(actor.id, actor)
-    }
-    for (const reference of changes.references) {
-      if (reference.deleted) references.delete(reference.key)
-      else references.set(reference.key, reference)
-    }
-    for (const item of changes.activators ?? []) {
-      if (item.deleted) activators.delete(item.id)
-      else activators.set(item.id, item)
-    }
-    for (const script of changes.propylonScripts ?? []) {
-      if (script.deleted) scripts.delete(script.id)
-      else scripts.set(script.id, script)
-    }
-    specialRoutes.push(...(changes.specialRoutes ?? []).filter((route) => ['folmsMaster', 'folms', 'mournhold', 'mournholdReturn'].includes(route.condition)))
-    for (const relocation of changes.conditionalRelocations ?? []) {
-      if (enabled.has(relocation.requiredSet)) relocations.set(relocation.actor, relocation.position)
-    }
+    apply(actors, changes.actors, (item) => item.id, (item) => item.deleted)
+    apply(references, changes.references, (item) => item.key, (item) => item.deleted)
+    apply(activators, changes.activators, (item) => item.id, (item) => item.deleted)
+    apply(scripts, changes.scripts, (item) => item.id, (item) => item.deleted)
+    dialogue.push(...(changes.dialogue ?? []))
   }
+  const cellSize = manifest.cellSize
   const doors = new Map<string, TransportReference[]>()
+  const placed = new Map<string, TransportReference[]>()
   for (const ref of references.values()) {
-    if (ref.destination && ref.cell) doors.set(ref.cell, [...(doors.get(ref.cell) ?? []), ref])
+    if (ref.destination && ref.cell) {
+      const list = doors.get(ref.cell)
+      if (list) list.push(ref)
+      else doors.set(ref.cell, [ref])
+    }
+    const list = placed.get(ref.actor)
+    if (list) list.push(ref)
+    else placed.set(ref.actor, [ref])
   }
+  /** Where a point inside or outside shows on the Map, and the anchor it belongs to. */
+  const place = (cell: string, position: Point): { position: Point; anchor?: Anchor } | null => {
+    if (!cell) return { position }
+    const anchor = data.anchors.find((item) => cell.startsWith(item.cells))
+    if (anchor) return { position: [anchor.x * cellSize, anchor.y * cellSize, 0], anchor }
+    const found = exterior(cell, position, doors)
+    return found ? { position: found } : null
+  }
+  const script = (actor: Actor) => (actor.script ? scripts.get(actor.script) : undefined)
+  const available = (actor: Actor) => {
+    const facts = script(actor)
+    return !facts?.requires?.some((set) => !enabled.has(set)) && !facts?.excludedBy?.some((set) => enabled.has(set))
+  }
+  const named = (actor: Actor): Named => ({ name: actor.name, ru: actor.ru })
+  const items = (ids: string[] | undefined) => ids?.length ? ids.map((id) => data.items.get(id) ?? { name: id }) : undefined
+  const relocations = new Map<string, Destination>()
+  for (const facts of scripts.values()) {
+    for (const move of facts.moves ?? []) {
+      if (enabled.has(move.set)) relocations.set(move.actor, move.to)
+    }
+  }
+
   const stops = new Map<string, TransportStop>()
-  const providers: { actor: Actor; ref: TransportReference; stop: TransportStop; mode: TransportMode }[] = []
-  for (const original of references.values()) {
-    const actor = actors.get(original.actor)
-    if (!actor || !actor.destinations.length) continue
-    if (REQUIRED_SETS[actor.id] && !enabled.has(REQUIRED_SETS[actor.id])) continue
-    if (EXCLUDED_SETS[actor.id] && enabled.has(EXCLUDED_SETS[actor.id])) continue
-    const relocated = relocations.get(actor.id)
-    const ref = relocated ? { ...original, position: relocated, cell: '' } : original
-    const mode = modeOf(actor)
-    if (!mode) continue
-    const position = exterior(ref.cell, ref.position, doors)
-    if (!position) continue
-    const id = mode === 'guild' && ref.cell ? `guild:${ref.cell}` : ref.key
-    const stop: TransportStop = stops.get(id) ?? { id, x: position[0] / manifest.cellSize, y: position[1] / manifest.cellSize, interior: ref.cell, modes: new Set([mode]), provider: actor.name, script: actor.script }
+  const addStop = (id: string, position: Point, interior: string, mode: TransportMode, extra: Partial<TransportStop> = {}): TransportStop => {
+    const existing = stops.get(id)
+    if (existing) {
+      existing.modes.add(mode)
+      return existing
+    }
+    const stop: TransportStop = { id, x: position[0] / cellSize, y: position[1] / cellSize, interior, modes: new Set([mode]), ...extra, approximate: extra.anchor ? true : undefined }
     stops.set(id, stop)
-    providers.push({ actor, ref, stop, mode })
+    return stop
   }
   const routes: TransportRoute[] = []
+  const seen = new Set<string>()
+  const addRoute = (route: TransportRoute) => {
+    const key = `${route.mode}|${route.from}|${route.to}|${route.providerId}`
+    if (route.from === route.to || seen.has(key)) return
+    seen.add(key)
+    routes.push(route)
+  }
+
+  // Carriers with travel destinations.
+  interface Provider { actor: Actor; ref: TransportReference; stop: TransportStop; mode: TransportMode }
+  const providers: Provider[] = []
+  for (const original of references.values()) {
+    const actor = actors.get(original.actor)
+    if (!actor?.mode || !actor.destinations.length || !available(actor)) continue
+    const relocated = relocations.get(actor.id)
+    const ref = relocated ? { ...original, position: relocated.position, cell: relocated.cell } : original
+    const at = place(ref.cell, ref.position)
+    if (!at) continue
+    const id = actor.mode === 'guild' && ref.cell ? `guild:${ref.cell}` : ref.key
+    const stop = addStop(id, at.position, ref.cell, actor.mode, { provider: named(actor), anchor: at.anchor })
+    providers.push({ actor, ref, stop, mode: actor.mode })
+  }
+  const byMode = new Map<TransportMode, Provider[]>()
+  for (const provider of providers) {
+    const list = byMode.get(provider.mode)
+    if (list) list.push(provider)
+    else byMode.set(provider.mode, [provider])
+  }
   for (const source of providers) {
     for (const destination of source.actor.destinations) {
-      const position = exterior(destination.cell, destination.position, doors)
-      if (!position) continue
-      const candidates = providers.filter((target) => target.mode === source.mode && target.stop.id !== source.stop.id &&
-        (destination.cell ? target.ref.cell === destination.cell : !target.ref.cell && distance(target.ref.position, destination.position) <= manifest.cellSize / 4))
-      candidates.sort((a, b) => distance(a.ref.position, destination.position) - distance(b.ref.position, destination.position))
-      const x = position[0] / manifest.cellSize
-      const y = position[1] / manifest.cellSize
-      const id = candidates[0]?.stop.id ?? `arrival:${source.mode}:${Math.round(x * 1000)}:${Math.round(y * 1000)}`
-      if (!stops.has(id)) stops.set(id, { id, x, y, interior: destination.cell, modes: new Set([source.mode]), provider: '', script: '' })
-      if (id !== source.stop.id) routes.push({ from: source.stop.id, to: id, mode: source.mode, provider: source.actor.name, providerId: source.actor.id, script: source.actor.script })
-    }
-  }
-  const masterRoutes = new Set<string>()
-  for (const reference of references.values()) {
-    const item = activators.get(reference.actor)
-    const script = item ? scripts.get(item.script) : undefined
-    if (!script?.destination || !script.requiredIndex || !reference.cell || !script.destination.cell) continue
-    const fromPosition = exterior(reference.cell, reference.position, doors)
-    const toPosition = exterior(script.destination.cell, script.destination.position, doors)
-    if (!fromPosition || !toPosition || reference.cell === script.destination.cell) continue
-    const from = `propylon:${reference.cell}`
-    const to = `propylon:${script.destination.cell}`
-    if (!stops.has(from)) stops.set(from, { id: from, x: fromPosition[0] / manifest.cellSize, y: fromPosition[1] / manifest.cellSize, interior: reference.cell, modes: new Set(['propylon']), provider: '', script: '' })
-    if (!stops.has(to)) stops.set(to, { id: to, x: toPosition[0] / manifest.cellSize, y: toPosition[1] / manifest.cellSize, interior: script.destination.cell, modes: new Set(['propylon']), provider: '', script: '' })
-    routes.push({ from, to, mode: 'propylon', provider: '', providerId: '', script: '', requiredIndex: script.requiredIndex })
-    if (script.masterDestination?.cell) {
-      const masterPosition = exterior(script.masterDestination.cell, script.masterDestination.position, doors)
-      const masterStop = `propylon:${script.masterDestination.cell}`
-      if (masterPosition && !masterRoutes.has(`${from}|${masterStop}`)) {
-        if (!stops.has(masterStop)) stops.set(masterStop, { id: masterStop, x: masterPosition[0] / manifest.cellSize, y: masterPosition[1] / manifest.cellSize, interior: script.masterDestination.cell, modes: new Set(['propylon']), provider: '', script: '' })
-        routes.push({ from, to: masterStop, mode: 'propylon', provider: '', providerId: '', script: '', requiredIndex: 'Index_Master' })
-        masterRoutes.add(`${from}|${masterStop}`)
+      const at = place(destination.cell, destination.position)
+      if (!at) continue
+      // The carrier waiting at the other end, so that both directions meet at one stop.
+      let target: Provider | undefined
+      let best = Infinity
+      for (const candidate of byMode.get(source.mode) ?? []) {
+        if (candidate.stop.id === source.stop.id) continue
+        const matches = destination.cell ? candidate.ref.cell === destination.cell : !candidate.ref.cell && distance(candidate.ref.position, destination.position) <= cellSize / 4
+        const away = distance(candidate.ref.position, destination.position)
+        if (matches && away < best) {
+          best = away
+          target = candidate
+        }
       }
+      const x = at.position[0] / cellSize
+      const y = at.position[1] / cellSize
+      const id = target?.stop.id ?? `arrival:${source.mode}:${Math.round(x * 1000)}:${Math.round(y * 1000)}`
+      addStop(id, at.position, destination.cell, source.mode, { anchor: at.anchor })
+      addRoute({ from: source.stop.id, to: id, mode: source.mode, provider: named(source.actor), providerId: source.actor.id, conditional: script(source.actor)?.conditional || undefined })
     }
   }
-  for (const route of specialRoutes) {
+
+  // Activators that move the player who carries an item, such as propylons.
+  const pointId = (mode: TransportMode, cell: string, at: { position: Point; anchor?: Anchor }) =>
+    at.anchor ? `anchor:${at.anchor.cells}` : cell ? `${mode}:${cell}` : `${mode}:${Math.round(at.position[0])}:${Math.round(at.position[1])}`
+  for (const ref of references.values()) {
+    const activator = activators.get(ref.actor)
+    const facts = activator ? scripts.get(activator.script) : undefined
+    if (!facts?.gates?.length) continue
+    const from = place(ref.cell, ref.position)
+    if (!from) continue
+    for (const gate of facts.gates) {
+      if (ref.cell && gate.to.cell === ref.cell) continue
+      const to = place(gate.to.cell, gate.to.position)
+      if (!to) continue
+      const fromId = pointId(gate.mode, ref.cell, from)
+      const toId = pointId(gate.mode, gate.to.cell, to)
+      addStop(fromId, from.position, ref.cell, gate.mode, { anchor: from.anchor })
+      addStop(toId, to.position, gate.to.cell, gate.mode, { anchor: to.anchor })
+      addRoute({ from: fromId, to: toId, mode: gate.mode, providerId: '', items: items(gate.items) })
+    }
+  }
+
+  // Transport offered in configured dialogue topics, from where the character stands.
+  for (const route of dialogue) {
     const actor = actors.get(route.actor)
-    const ref = [...references.values()].find((item) => item.actor === route.actor)
-    if (!actor || (!route.from && !ref)) continue
-    const origin = route.from ?? { cell: ref!.cell, position: ref!.position }
-    const fromPosition: [number, number, number] | null = route.condition === 'mournholdReturn' ? [23.5 * manifest.cellSize, -27.5 * manifest.cellSize, 0] : exterior(origin.cell, origin.position, doors)
-    const approximate = route.condition === 'mournhold'
-    const toPosition: [number, number, number] | null = approximate ? [23.5 * manifest.cellSize, -27.5 * manifest.cellSize, 0] : exterior(route.to.cell, route.to.position, doors)
-    if (!fromPosition || !toPosition) continue
-    const stopId = (point: Destination, pos: [number, number, number]) => route.mode === 'propylon' && point.cell
-      ? `propylon:${point.cell}`
-      : `special:${route.mode}:${Math.round(pos[0])}:${Math.round(pos[1])}`
-    const from = route.condition === 'mournholdReturn' ? 'special:approximate:mournhold' : stopId(origin, fromPosition)
-    const to = approximate ? 'special:approximate:mournhold' : stopId(route.to, toPosition)
-    if (from === to || routes.some((item) => item.from === from && item.to === to && item.providerId === route.actor && item.mode === route.mode)) continue
-    if (!stops.has(from)) stops.set(from, { id: from, x: fromPosition[0] / manifest.cellSize, y: fromPosition[1] / manifest.cellSize, interior: origin.cell, modes: new Set([route.mode]), provider: actor.name, script: '', label: route.fromLabel, approximate: route.condition === 'mournholdReturn' })
-    if (!stops.has(to)) stops.set(to, { id: to, x: toPosition[0] / manifest.cellSize, y: toPosition[1] / manifest.cellSize, interior: route.to.cell, modes: new Set([route.mode]), provider: '', script: '', label: route.toLabel, approximate })
-    routes.push({ from, to, mode: route.mode, provider: actor.name, providerId: route.actor, script: '', condition: route.condition })
+    const ref = placed.get(route.actor)?.[0]
+    if (!actor || !ref || !available(actor)) continue
+    const from = place(ref.cell, ref.position)
+    const to = place(route.to.cell, route.to.position)
+    if (!from || !to) continue
+    const fromId = pointId(route.mode, ref.cell, from)
+    const toId = pointId(route.mode, route.to.cell, to)
+    addStop(fromId, from.position, ref.cell, route.mode, { provider: named(actor), anchor: from.anchor })
+    addStop(toId, to.position, route.to.cell, route.mode, { anchor: to.anchor })
+    addRoute({ from: fromId, to: toId, mode: route.mode, provider: named(actor), providerId: actor.id, items: items(route.items), dialogue: true, conditional: script(actor)?.conditional || undefined })
   }
   return { stops, routes }
 }
 
-export function stopName(stop: TransportStop, locations: Location[]): string {
-  if (stop.interior) {
-    const entrance = locations.find((location) => location.kind === 'entrance' &&
-      location.en.toLowerCase() === stop.interior && Math.hypot(location.x - stop.x, location.y - stop.y) <= 1)
-    if (entrance) return entrance.name
-    if (stop.id?.startsWith('propylon:')) {
-      return stop.interior.split(',')[0].replace(/\b\w/g, (letter) => letter.toUpperCase())
+/**
+ * Names stops after the Location they are at: the Interior Entrance of their interior, or the
+ * Settlement around them, falling back to the carrier and the Cell. Build it once per list.
+ */
+export function createStopNamer(locations: Location[], localName: (named: Named) => string = (named) => named.name): (stop: Pick<TransportStop, 'x' | 'y' | 'interior' | 'id' | 'provider'>) => string {
+  const entrances = new Map<string, Location[]>()
+  const settlements = new Map<string, Location[]>()
+  const bucket = (map: Map<string, Location[]>, key: string, location: Location) => {
+    const list = map.get(key)
+    if (list) list.push(location)
+    else map.set(key, [location])
+  }
+  for (const location of locations) {
+    if (location.kind === 'entrance') bucket(entrances, location.en.toLowerCase(), location)
+    else if (location.kind === 'settlement') {
+      const cells = new Set([`${Math.floor(location.x)},${Math.floor(location.y)}`, ...(location.cells ?? []).map(([x, y]) => `${x},${y}`)])
+      for (const cell of cells) bucket(settlements, cell, location)
     }
   }
-  const candidates = locations.filter((location) => location.kind === 'settlement' &&
-    (location.cells?.some(([x, y]) => x === Math.floor(stop.x) && y === Math.floor(stop.y)) || Math.hypot(location.x - stop.x, location.y - stop.y) <= 0.75))
-  candidates.sort((a, b) => Math.hypot(a.x - stop.x, a.y - stop.y) - Math.hypot(b.x - stop.x, b.y - stop.y))
-  return candidates[0]?.name ?? (stop.provider ? `${stop.provider} (${Math.floor(stop.x)}, ${Math.floor(stop.y)})` : `${Math.floor(stop.x)}, ${Math.floor(stop.y)}`)
+  return (stop) => {
+    if (stop.interior) {
+      const entrance = entrances.get(stop.interior)?.find((location) => Math.hypot(location.x - stop.x, location.y - stop.y) <= 1)
+      if (entrance) return entrance.name
+      if (stop.id?.startsWith('propylon:')) return stop.interior.split(',')[0].replace(/\b\w/g, (letter) => letter.toUpperCase())
+    }
+    const x = Math.floor(stop.x)
+    const y = Math.floor(stop.y)
+    const nearby = new Set<Location>()
+    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) for (const location of settlements.get(`${x + dx},${y + dy}`) ?? []) nearby.add(location)
+    const candidates = [...nearby].filter((location) =>
+      location.cells?.some(([cx, cy]) => cx === x && cy === y) || Math.hypot(location.x - stop.x, location.y - stop.y) <= 0.75)
+    candidates.sort((a, b) => Math.hypot(a.x - stop.x, a.y - stop.y) - Math.hypot(b.x - stop.x, b.y - stop.y))
+    return candidates[0]?.name ?? (stop.provider ? `${localName(stop.provider)} (${x}, ${y})` : `${x}, ${y}`)
+  }
+}
+
+export function stopName(stop: Pick<TransportStop, 'x' | 'y' | 'interior' | 'id' | 'provider'>, locations: Location[], localName?: (named: Named) => string): string {
+  return createStopNamer(locations, localName)(stop)
 }

@@ -47,3 +47,31 @@ _Avoid_: Door, dungeon, interior
 **Region**:
 A Location that is a named area of the exterior spanning many Cells. It is shown by its name when the Map is zoomed far out, and as a colour tint over its Cells when the viewer switches that tint on in the legend.
 _Avoid_: Zone, area, biome
+
+### Transport
+
+**Carrier**:
+A character or creature that takes the player to other places for money: it has travel destinations in its plugin, or offers transport in a configured dialogue topic. Its transport mode comes from its class, set in `plugin-sets.toml`.
+_Avoid_: Provider, NPC, service
+
+**Route**:
+One way from a Stop to another by one Carrier or Gate. A Route has a direction; the way back is a Route of its own, and the Map shows it only where the plugins have one.
+_Avoid_: Connection, link, path
+
+**Stop**:
+A point on the Map where Routes begin or end. A Carrier inside an interior has its Stop where the doors of that interior lead out; the guild guides of one hall share one Stop.
+_Avoid_: Station, node
+
+**Gate**:
+An activator that moves the player while the player carries a certain item, such as a propylon and its index.
+_Avoid_: Portal, teleport
+
+**Anchor**:
+The one point on the Map that stands for a place made only of interiors, such as Mournhold; its Stops are approximate.
+_Avoid_: Fake location, placeholder
+
+**Intervention Marker**:
+The point that Almsivi or Divine Intervention takes the player to, as the plugins place it in the exterior.
+_Avoid_: Temple marker, shrine
+
+The legend calls Plugin Sets "map modules" ("модули карты"); in code and documents they stay Plugin Sets.

@@ -1,10 +1,11 @@
 import L from 'leaflet'
-import { t } from './i18n'
+import { localName, t } from './i18n'
 import { closestIntervention, interventionMarkers, type InterventionKind, type InterventionMarker, type InterventionPoint } from './intervention-data'
 import { closeLegendInfoWithin, createLegendInfo } from './legend-info'
 import type { Location } from './locations'
 import type { Manifest } from './manifest'
-import { stopName, type TransportData } from './transport-data'
+import { createStopNamer, type TransportData } from './transport-data'
+import { updateUrl } from './url'
 
 const KINDS: InterventionKind[] = ['temple', 'divine']
 const COLORS: Record<InterventionKind, string> = { temple: '#e78151', divine: '#59baf1' }
@@ -40,9 +41,7 @@ export function createIntervention(map: L.Map, data: TransportData, manifest: Ma
       map.closePopup()
       if (!active.size) {
         KINDS.forEach((kind) => active.add(kind))
-        const query = new URLSearchParams(location.search)
-        query.set('intervention', [...active].join(','))
-        history.replaceState(null, '', `?${query}`)
+        saveActive()
         draw()
       }
       if (map.getSize().x < 600) {
@@ -79,18 +78,30 @@ export function createIntervention(map: L.Map, data: TransportData, manifest: Ma
     }
   }
 
-  function markerName(marker: InterventionMarker): string {
+  function saveActive(): void {
+    updateUrl((params) => {
+      if (active.size) params.set('intervention', [...active].join(','))
+      else params.delete('intervention')
+    })
+  }
+
+  /** Names markers after the Location they are at; build it once per drawing. */
+  function markerNamer(): (marker: InterventionMarker) => string {
     const available = locations.filter((item) => getSets().has(item.set.id))
-    const exact = marker.location && available.find((item) => item.en.toLowerCase() === marker.location!.toLowerCase() && Math.hypot(item.x - marker.x, item.y - marker.y) < 2)
-    if (exact) return exact.name
-    const nearby = stopName({ id: marker.key, x: marker.x, y: marker.y, interior: '', modes: new Set(), provider: '', script: '' }, available)
-    const cell = `${Math.floor(marker.x)}, ${Math.floor(marker.y)}`
-    return nearby !== cell ? nearby : marker.location || t('cell', { x: Math.floor(marker.x), y: Math.floor(marker.y) })
+    const namer = createStopNamer(available, localName)
+    return (marker) => {
+      const exact = marker.location && available.find((item) => item.en.toLowerCase() === marker.location!.toLowerCase() && Math.hypot(item.x - marker.x, item.y - marker.y) < 2)
+      if (exact) return exact.name
+      const nearby = namer({ id: marker.key, x: marker.x, y: marker.y, interior: '' })
+      const cell = `${Math.floor(marker.x)}, ${Math.floor(marker.y)}`
+      return nearby !== cell ? nearby : marker.location || t('cell', { x: Math.floor(marker.x), y: Math.floor(marker.y) })
+    }
   }
 
   function draw(): void {
     markersLayer.clearLayers()
     resultLayer.clearLayers()
+    const markerName = markerNamer()
     for (const marker of markers) {
       if (!active.has(marker.kind)) continue
       const tooltip = document.createElement('span')
@@ -125,9 +136,7 @@ export function createIntervention(map: L.Map, data: TransportData, manifest: Ma
       input.addEventListener('change', () => {
         if (input.checked) active.add(kind)
         else active.delete(kind)
-        const query = new URLSearchParams(location.search)
-        query.set('intervention', [...active].join(','))
-        history.replaceState(null, '', `?${query}`)
+        saveActive()
         draw()
         render()
       })
@@ -160,6 +169,7 @@ export function createIntervention(map: L.Map, data: TransportData, manifest: Ma
       const results = document.createElement('div')
       results.className = 'intervention-results'
       results.setAttribute('aria-live', 'polite')
+      const markerName = markerNamer()
       for (const kind of KINDS) {
         const found = closestIntervention(markers, kind, point)
         const row = document.createElement('div')
