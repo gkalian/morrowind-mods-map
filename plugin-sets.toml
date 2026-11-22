@@ -92,7 +92,7 @@ ignore_cell_names = [[27, -52], [46, -50]]
 # The build lists the carriers whose class is not here; they are left out.
 classes = { "Shipmaster" = "water", "Gondolier" = "water", "T_Mw_RiverstriderService" = "water", "T_Glb_Fisherman" = "water", "Caravaner" = "land", "Slave" = "land", "Guild Guide" = "guild" }
 # Carriers whose class does not tell the mode, by their id.
-actors = { "TR_m7_Relenu Drolan" = "air", "TR_m7_Ulath-Bael" = "air", "TR_m4_Nassuran Omoril" = "land", "TR_m1_DaedrothGindaman" = "guild", "Blatta Hateria" = "water", "vevrana aryon" = "water", "rindral dralor" = "water" }
+actors = { "TR_m7_Relenu Drolan" = "air", "TR_m7_Ulath-Bael" = "air", "TR_m4_Nassuran Omoril" = "land", "TR_m1_DaedrothGindaman" = "guild", "Blatta Hateria" = "water", "vevrana aryon" = "water", "rindral dralor" = "water", "az_Regatto Ranyon" = "water" }
 # An activator script that moves the player while the player carries one of these items is a
 # route of this mode; `*` at the end matches any ending.
 gates = { "index_*" = "propylon", "T_De_Index_*" = "propylon" }
